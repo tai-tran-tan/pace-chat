@@ -1,0 +1,1268 @@
+openapi: 3.0.3
+info:
+  title: General Purpose Chat App API
+  version: 1.0.0
+  description: |
+    Backend API for a general purpose chat application.
+    It combines **HTTP (REST)** for user management, conversation management, message history, and file uploads,
+    and **WebSockets (WSS)** for real-time communication such as sending/receiving messages, typing indicators, and presence updates.
+
+servers:
+  - url: https://api.yourchatapp.com/v1
+    description: Main HTTP API server
+  - url: wss://api.yourchatapp.com/ws/chat
+    description: |
+      WebSocket server for real-time chat messages and presence.
+
+      **Authentication:**
+      Upon connection, the client must send an `AUTH` message with a valid JWT access token.
+      Example: `{"type": "AUTH", "token": "your.jwt.access.token"}`
+
+      **WebSocket Message Types (JSON Payload):**
+      (Full schemas for these messages are defined in `components/schemas` below)
+
+      * **Client to Server:**
+          * `AUTH`: Initial authentication with JWT token.
+          * `SEND_MESSAGE`: To send a new text or media message.
+          * `TYPING_INDICATOR`: To signal that the user is typing.
+          * `READ_RECEIPT`: To mark messages as read.
+      * **Server to Client:**
+          * `AUTH_SUCCESS`: Confirmation of successful authentication.
+          * `AUTH_FAILURE`: Notification of authentication failure.
+          * `MESSAGE_DELIVERED`: Acknowledgment that a message sent by the client was received by the server.
+          * `MESSAGE_RECEIVED`: A new message from another user.
+          * `TYPING_INDICATOR`: Notification that another user is typing.
+          * `MESSAGE_READ_STATUS`: Update on who has read a particular message.
+          * `PRESENCE_UPDATE`: Changes in user online/offline status.
+          * `CONVERSATION_UPDATE`: Updates to conversation details (e.g., group name change, participant added/removed).
+
+security:
+  - bearerAuth: [] # All HTTP endpoints require a bearer token unless specified otherwise
+
+tags:
+  - name: Authentication
+    description: User registration, login, and token management
+  - name: Users
+    description: User profile and search operations
+  - name: Conversations
+    description: Managing chat conversations (private and group)
+  - name: Messages
+    description: Retrieving chat messages (history) and file uploads
+  - name: Notifications
+    description: Managing device tokens for push notifications
+
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRegisterRequest'
+            examples:
+              newUser:
+                value:
+                  username: "alice_smith"
+                  password: "MySecurePassword123!"
+                  email: "alice.smith@example.com"
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthRegisterResponse'
+              examples:
+                success:
+                  value:
+                    user_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                    username: "alice_smith"
+                    message: "User registered successfully."
+        '400':
+          description: Bad request (e.g., username/email already exists)
+  /auth/login:
+    post:
+      summary: Authenticate user and get tokens
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+            examples:
+              loginAttempt:
+                value:
+                  username: "alice_smith"
+                  password: "MySecurePassword123!"
+      responses:
+        '200':
+          description: User logged in successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthLoginResponse'
+              examples:
+                success:
+                  value:
+                    user_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                    username: "alice_smith"
+                    token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFsaWNlIFNtaXRoIiwiaWF0IjoxNTE2MjM5MDIyfQ.some_generated_access_token_jwt"
+                    refresh_token: "refresh.token.abcdef123456"
+        '401':
+          description: Invalid credentials
+  /auth/refresh-token:
+    post:
+      summary: Refresh access token
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+            examples:
+              refreshAttempt:
+                value:
+                  refresh_token: "refresh.token.abcdef123456"
+      responses:
+        '200':
+          description: New access token generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenResponse'
+              examples:
+                success:
+                  value:
+                    token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFsaWNlIFNtaXRoIiwiaWF0IjoxNTE2MjM5MDIyfQ.new_generated_access_token_jwt"
+        '401':
+          description: Invalid refresh token
+
+  /users/me:
+    get:
+      summary: Get authenticated user's profile
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              examples:
+                myProfile:
+                  value:
+                    user_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                    username: "alice_smith"
+                    email: "alice.smith@example.com"
+                    status: "online"
+                    avatar_url: "https://cdn.yourchatapp.com/avatars/alice.jpg"
+                    last_seen: "2025-06-06T10:00:00Z"
+        '401':
+          description: Unauthorized
+    put:
+      summary: Update authenticated user's profile
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdate'
+            examples:
+              updateAvatar:
+                value:
+                  avatar_url: "https://cdn.yourchatapp.com/avatars/alice_new.png"
+              updateUsername:
+                value:
+                  username: "alice_in_wonderland"
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Profile updated successfully."
+        '401':
+          description: Unauthorized
+  /users/search:
+    get:
+      summary: Search for users
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: query
+          schema:
+            type: string
+            example: "bob"
+          required: true
+          description: Search term for username or email
+      responses:
+        '200':
+          description: List of matching users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserPublic'
+              examples:
+                searchResults:
+                  value:
+                    - user_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+                      username: "bob_jones"
+                      avatar_url: "https://cdn.yourchatapp.com/avatars/bob.jpg"
+                    - user_id: "c1d2e3f4-a5b6-7890-1234-567890abcdef"
+                      username: "bobby_d"
+                      avatar_url: null
+        '401':
+          description: Unauthorized
+
+  /conversations:
+    get:
+      summary: Get all conversations for the authenticated user
+      tags:
+        - Conversations
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Conversation'
+              examples:
+                myConversations:
+                  value:
+                    - conversation_id: "conv-1111-2222-3333-4444"
+                      type: "private"
+                      name: null
+                      participants:
+                        - user_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                          username: "alice_smith"
+                          avatar_url: "https://cdn.yourchatapp.com/avatars/alice.jpg"
+                        - user_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+                          username: "bob_jones"
+                          avatar_url: "https://cdn.yourchatapp.com/avatars/bob.jpg"
+                      last_message_preview: "Hey, how are you?"
+                      last_message_timestamp: "2025-06-06T10:30:00Z"
+                      unread_count: 0
+                    - conversation_id: "conv-5555-6666-7777-8888"
+                      type: "group"
+                      name: "Dev Team Chat"
+                      participants:
+                        - user_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                          username: "alice_smith"
+                          avatar_url: "https://cdn.yourchatapp.com/avatars/alice.jpg"
+                        - user_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+                          username: "bob_jones"
+                          avatar_url: "https://cdn.yourchatapp.com/avatars/bob.jpg"
+                        - user_id: "c1d2e3f4-a5b6-7890-1234-567890abcdef"
+                          username: "charlie_d"
+                          avatar_url: null
+                      last_message_preview: "Don't forget the standup at 9 AM!"
+                      last_message_timestamp: "2025-06-05T09:00:00Z"
+                      unread_count: 3
+        '401':
+          description: Unauthorized
+  /conversations/private:
+    post:
+      summary: Create or get a private conversation with another user
+      tags:
+        - Conversations
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationPrivateRequest'
+            examples:
+              createPrivateChat:
+                value:
+                  target_user_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+      responses:
+        '200':
+          description: Existing private conversation retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+              examples:
+                existingChat:
+                  value:
+                    conversation_id: "conv-1111-2222-3333-4444"
+                    type: "private"
+                    name: null
+                    participants:
+                      - user_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                        username: "alice_smith"
+                        avatar_url: "https://cdn.yourchatapp.com/avatars/alice.jpg"
+                      - user_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+                        username: "bob_jones"
+                        avatar_url: "https://cdn.yourchatapp.com/avatars/bob.jpg"
+                    last_message_preview: "Hey, how are you?"
+                    last_message_timestamp: "2025-06-06T10:30:00Z"
+                    unread_count: 0
+        '201':
+          description: New private conversation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+              examples:
+                newChat:
+                  value:
+                    conversation_id: "conv-9999-aaaa-bbbb-cccc"
+                    type: "private"
+                    name: null
+                    participants:
+                      - user_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                        username: "alice_smith"
+                        avatar_url: "https://cdn.yourchatapp.com/avatars/alice.jpg"
+                      - user_id: "d1e2f3a4-b5c6-7890-1234-567890abcdef"
+                        username: "david_jones"
+                        avatar_url: null
+                    last_message_preview: null
+                    last_message_timestamp: null
+                    unread_count: 0
+        '401':
+          description: Unauthorized
+        '404':
+          description: Target user not found
+  /conversations/group:
+    post:
+      summary: Create a new group conversation
+      tags:
+        - Conversations
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationGroupCreateRequest'
+            examples:
+              createGroup:
+                value:
+                  name: "Project Apollo"
+                  participant_ids:
+                    - "a1b2c3d4-e5f6-7890-1234-567890abcdef" # Alice (creator)
+                    - "b1c2d3e4-f5a6-7890-1234-567890abcdef" # Bob
+                    - "c1d2e3f4-a5b6-7890-1234-567890abcdef" # Charlie
+      responses:
+        '201':
+          description: Group conversation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+              examples:
+                newGroup:
+                  value:
+                    conversation_id: "conv-group-apollo-1"
+                    type: "group"
+                    name: "Project Apollo"
+                    participants:
+                      - user_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                        username: "alice_smith"
+                        avatar_url: "https://cdn.yourchatapp.com/avatars/alice.jpg"
+                      - user_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+                        username: "bob_jones"
+                        avatar_url: "https://cdn.yourchatapp.com/avatars/bob.jpg"
+                      - user_id: "c1d2e3f4-a5b6-7890-1234-567890abcdef"
+                        username: "charlie_d"
+                        avatar_url: null
+                    last_message_preview: null
+                    last_message_timestamp: null
+                    unread_count: 0
+        '401':
+          description: Unauthorized
+        '400':
+          description: Invalid participant IDs or other creation error
+  /conversations/{conversationId}:
+    get:
+      summary: Get details of a specific conversation
+      tags:
+        - Conversations
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: conversationId
+          schema:
+            type: string
+            format: uuid
+            example: "conv-group-apollo-1"
+          required: true
+          description: ID of the conversation
+      responses:
+        '200':
+          description: Conversation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+              examples:
+                groupApolloDetails:
+                  value:
+                    conversation_id: "conv-group-apollo-1"
+                    type: "group"
+                    name: "Project Apollo"
+                    participants:
+                      - user_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                        username: "alice_smith"
+                        avatar_url: "https://cdn.yourchatapp.com/avatars/alice.jpg"
+                      - user_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+                        username: "bob_jones"
+                        avatar_url: "https://cdn.yourchatapp.com/avatars/bob.jpg"
+                      - user_id: "c1d2e3f4-a5b6-7890-1234-567890abcdef"
+                        username: "charlie_d"
+                        avatar_url: null
+                    last_message_preview: "Meeting at 3 PM today."
+                    last_message_timestamp: "2025-06-06T10:55:00Z"
+                    unread_count: 0
+        '401':
+          description: Unauthorized
+        '404':
+          description: Conversation not found or not accessible
+
+  /conversations/group/{conversationId}/participants:
+    put:
+      summary: Add or remove participants from a group conversation
+      tags:
+        - Conversations
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: conversationId
+          schema:
+            type: string
+            format: uuid
+            example: "conv-group-apollo-1"
+          required: true
+          description: ID of the group conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationGroupParticipantsUpdate'
+            examples:
+              addParticipant:
+                value:
+                  add_ids: ["e1f2g3h4-i5j6-7890-1234-567890abcdef"] # David
+              removeParticipant:
+                value:
+                  remove_ids: ["c1d2e3f4-a5b6-7890-1234-567890abcdef"] # Charlie
+              addAndRemove:
+                value:
+                  add_ids: ["e1f2g3h4-i5j6-7890-1234-567890abcdef"] # David
+                  remove_ids: ["c1d2e3f4-a5b6-7890-1234-567890abcdef"] # Charlie
+      responses:
+        '200':
+          description: Group participants updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Group participants updated."
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (e.g., user not an admin of the group)
+        '404':
+          description: Conversation or participant not found
+  /conversations/{conversationId}/messages:
+    get:
+      summary: Get message history for a conversation
+      tags:
+        - Messages
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: conversationId
+          schema:
+            type: string
+            format: uuid
+            example: "conv-1111-2222-3333-4444"
+          required: true
+          description: ID of the conversation
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 50
+            example: 20
+          description: Number of messages to retrieve
+        - in: query
+          name: before_message_id
+          schema:
+            type: string
+            format: uuid
+            example: "msg-older-than-this-id"
+          description: Retrieve messages older than this message ID (for pagination)
+      responses:
+        '200':
+          description: Message history retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesHistoryResponse'
+              examples:
+                firstPage:
+                  value:
+                    messages:
+                      - message_id: "msg-oldest-on-page"
+                        conversation_id: "conv-1111-2222-3333-4444"
+                        sender_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+                        content: "What's up?"
+                        message_type: "text"
+                        timestamp: "2025-06-06T10:45:00Z"
+                        read_by: ["a1b2c3d4-e5f6-7890-1234-567890abcdef"]
+                      - message_id: "msg-middle-on-page"
+                        conversation_id: "conv-1111-2222-3333-4444"
+                        sender_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+                        content: "Hey, how are you?"
+                        message_type: "text"
+                        timestamp: "2025-06-06T10:50:00Z"
+                        read_by: []
+                      - message_id: "msg-newest-on-page"
+                        conversation_id: "conv-1111-2222-3333-4444"
+                        sender_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+                        content: "I'm good, thanks!"
+                        message_type: "text"
+                        timestamp: "2025-06-06T10:55:00Z"
+                        read_by: []
+                    has_more: true
+                    next_before_message_id: "msg-oldest-on-page"
+                lastPage:
+                  value:
+                    messages:
+                      - message_id: "msg-very-old-1"
+                        conversation_id: "conv-1111-2222-3333-4444"
+                        sender_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+                        content: "Initial message in chat."
+                        message_type: "text"
+                        timestamp: "2025-06-06T09:00:00Z"
+                        read_by: ["a1b2c3d4-e5f6-7890-1234-567890abcdef"]
+                    has_more: false
+                    next_before_message_id: null
+        '401':
+          description: Unauthorized
+        '404':
+          description: Conversation not found or not accessible
+
+  /messages/upload:
+    post:
+      summary: Upload a media file
+      tags:
+        - Messages
+        - Files
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The media file to upload (image, video, document)
+            examples:
+              imageUpload:
+                value:
+                  file: <binary data for image.jpg>
+      responses:
+        '201':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUploadResponse'
+              examples:
+                success:
+                  value:
+                    file_url: "https://cdn.yourchatapp.com/uploads/2025/06/6/image-xyz.jpg"
+                    file_type: "image/jpeg"
+                    file_size: 1234567
+        '400':
+          description: Invalid file type or size
+        '401':
+          description: Unauthorized
+
+  /users/me/device-token:
+    post:
+      summary: Register or update user's device token for push notifications
+      tags:
+        - Notifications
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceTokenRegistration'
+            examples:
+              registerAndroidToken:
+                value:
+                  device_token: "fcm_token_abcdefg1234567890"
+                  platform: "android"
+              registerIosToken:
+                value:
+                  device_token: "apns_token_zyxwvu9876543210"
+                  platform: "ios"
+      responses:
+        '200':
+          description: Device token registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Device token registered."
+        '401':
+          description: Unauthorized
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    # --- Auth & User Schemas ---
+    AuthRegisterRequest:
+      type: object
+      required:
+        - username
+        - password
+        - email
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: "^[a-zA-Z0-9_]+$"
+          example: "john_doe"
+        password:
+          type: string
+          minLength: 8
+          example: "StrongPassword123!"
+        email:
+          type: string
+          format: email
+          example: "john.doe@example.com"
+    AuthRegisterResponse:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: Unique ID of the registered user
+          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+        username:
+          type: string
+          example: "john_doe"
+        message:
+          type: string
+          example: "User registered successfully."
+    AuthLoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: "john_doe"
+        password:
+          type: string
+          example: "StrongPassword123!"
+    AuthLoginResponse:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+        username:
+          type: string
+          example: "john_doe"
+        token:
+          type: string
+          description: JWT Access Token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.sample_access_token"
+        refresh_token:
+          type: string
+          description: JWT Refresh Token
+          example: "sample_refresh_token_xyz"
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          example: "sample_refresh_token_xyz"
+    RefreshTokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: New JWT Access Token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.new_sample_access_token"
+    User:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+        username:
+          type: string
+          example: "john_doe"
+        email:
+          type: string
+          format: email
+          example: "john.doe@example.com"
+        status:
+          type: string
+          enum: [online, offline, away]
+          description: Current presence status (real-time via WebSocket)
+          example: "online"
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+          description: URL to user's avatar image
+          example: "https://cdn.yourchatapp.com/avatars/john.jpg"
+        last_seen:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of last activity if offline
+          example: "2025-06-06T10:00:00Z"
+    UserPublic: # Simplified user object for search results, participants etc.
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          example: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+        username:
+          type: string
+          example: "jane_smith"
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://cdn.yourchatapp.com/avatars/jane.png"
+    ProfileUpdate:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: "^[a-zA-Z0-9_]+$"
+          example: "john_new_name"
+        email:
+          type: string
+          format: email
+          example: "john.new.email@example.com"
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://cdn.yourchatapp.com/avatars/john_updated.jpg"
+      minProperties: 1 # At least one field must be present for update
+
+    # --- Conversation Schemas ---
+    Conversation:
+      type: object
+      required:
+        - conversation_id
+        - type
+        - participants
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+          example: "conv-1111-2222-3333-4444"
+        type:
+          type: string
+          enum: [private, group]
+          example: "private"
+        name:
+          type: string
+          nullable: true
+          description: Name for group chats, null for private chats
+          example: "Dev Team Chat"
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserPublic'
+          example:
+            - user_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+              username: "alice_smith"
+              avatar_url: "https://cdn.yourchatapp.com/avatars/alice.jpg"
+            - user_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+              username: "bob_jones"
+              avatar_url: "https://cdn.yourchatapp.com/avatars/bob.jpg"
+        last_message_preview:
+          type: string
+          nullable: true
+          description: A snippet of the last message in the conversation
+          example: "Hey, how are you?"
+        last_message_timestamp:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2025-06-06T10:30:00Z"
+        unread_count:
+          type: integer
+          format: int32
+          minimum: 0
+          example: 2
+    ConversationPrivateRequest:
+      type: object
+      required:
+        - target_user_id
+      properties:
+        target_user_id:
+          type: string
+          format: uuid
+          description: The user ID to start a private conversation with
+          example: "d1e2f3a4-b5c6-7890-1234-567890abcdef"
+    ConversationGroupCreateRequest:
+      type: object
+      required:
+        - name
+        - participant_ids
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "Frontend Devs"
+        participant_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 2 # Including the creator
+          description: List of user IDs to include in the group
+          example:
+            - "a1b2c3d4-e5f6-7890-1234-567890abcdef" # Creator
+            - "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+            - "c1d2e3f4-a5b6-7890-1234-567890abcdef"
+    ConversationGroupParticipantsUpdate:
+      type: object
+      properties:
+        add_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: List of user IDs to add to the group
+          example: ["e1f2g3h4-i5j6-7890-1234-567890abcdef"]
+        remove_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: List of user IDs to remove from the group
+          example: ["f1g2h3i4-j5k6-7890-1234-567890abcdef"]
+      minProperties: 1 # At least one of add_ids or remove_ids must be present
+
+    # --- Message Schemas ---
+    Message:
+      type: object
+      required:
+        - message_id
+        - conversation_id
+        - sender_id
+        - content
+        - message_type
+        - timestamp
+      properties:
+        message_id:
+          type: string
+          format: uuid
+          description: Unique ID of the message
+          example: "msg-1234-5678-abcd-efgh"
+        conversation_id:
+          type: string
+          format: uuid
+          example: "conv-1111-2222-3333-4444"
+        sender_id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+        content:
+          type: string
+          description: Message content (text, or URL for media)
+          example: "Hello team, let's start the meeting!"
+        message_type:
+          type: string
+          enum: [text, image, video, file]
+          example: "text"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-06-06T11:00:00Z"
+        read_by:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: List of user IDs who have read this message
+          default: []
+          example: ["b1c2d3e4-f5a6-7890-1234-567890abcdef"]
+    MessagesHistoryResponse:
+      type: object
+      required:
+        - messages
+        - has_more
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+          description: List of messages, ordered from oldest to newest by default
+        has_more:
+          type: boolean
+          description: Indicates if there are more messages available before the current set
+          example: true
+        next_before_message_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The message_id to use for the next pagination request (the oldest message in the current list)
+          example: "msg-oldest-on-page"
+    FileUploadResponse:
+      type: object
+      required:
+        - file_url
+        - file_type
+        - file_size
+      properties:
+        file_url:
+          type: string
+          format: uri
+          description: URL where the uploaded file is accessible
+          example: "https://cdn.yourchatapp.com/uploads/2025/06/6/meeting-notes.pdf"
+        file_type:
+          type: string
+          description: MIME type of the uploaded file (e.g., image/jpeg, application/pdf)
+          example: "application/pdf"
+        file_size:
+          type: integer
+          format: int64
+          description: Size of the uploaded file in bytes
+          example: 567890
+
+    # --- Notification Schemas ---
+    DeviceTokenRegistration:
+      type: object
+      required:
+        - device_token
+        - platform
+      properties:
+        device_token:
+          type: string
+          description: FCM or APNS device token
+          example: "fcm_token_xyz_123_abc_456"
+        platform:
+          type: string
+          enum: [android, ios]
+          example: "android"
+
+    # --- WebSocket Message Schemas (for documentation purposes) ---
+    WsAuthMessage:
+      type: object
+      required:
+        - type
+        - token
+      properties:
+        type:
+          type: string
+          enum: [AUTH]
+          example: "AUTH"
+        token:
+          type: string
+          description: JWT Access Token
+          example: "your.jwt.access.token.here"
+    WsAuthSuccess:
+      type: object
+      required:
+        - type
+        - user_id
+      properties:
+        type:
+          type: string
+          enum: [AUTH_SUCCESS]
+          example: "AUTH_SUCCESS"
+        user_id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+    WsAuthFailure:
+      type: object
+      required:
+        - type
+        - reason
+      properties:
+        type:
+          type: string
+          enum: [AUTH_FAILURE]
+          example: "AUTH_FAILURE"
+        reason:
+          type: string
+          example: "Invalid token or expired."
+    WsSendMessage:
+      type: object
+      required:
+        - type
+        - conversation_id
+        - content
+        - message_type
+        - client_message_id
+      properties:
+        type:
+          type: string
+          enum: [SEND_MESSAGE]
+          example: "SEND_MESSAGE"
+        conversation_id:
+          type: string
+          format: uuid
+          example: "conv-1111-2222-3333-4444"
+        content:
+          type: string
+          description: Message content (text, or URL for media)
+          example: "Hello team!"
+        message_type:
+          type: string
+          enum: [text, image, video, file]
+          example: "text"
+        client_message_id:
+          type: string
+          description: Unique ID generated by the client for acknowledging this message
+          example: "client-msg-abc-123"
+    WsMessageDelivered:
+      type: object
+      required:
+        - type
+        - client_message_id
+        - server_message_id
+        - timestamp
+        - status
+      properties:
+        type:
+          type: string
+          enum: [MESSAGE_DELIVERED]
+          example: "MESSAGE_DELIVERED"
+        client_message_id:
+          type: string
+          example: "client-msg-abc-123"
+        server_message_id:
+          type: string
+          format: uuid
+          example: "msg-server-xyz-789"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-06-06T11:00:05Z"
+        status:
+          type: string
+          enum: [success, failure]
+          example: "success"
+    WsMessageReceived:
+      type: object
+      required:
+        - type
+        - message
+      properties:
+        type:
+          type: string
+          enum: [MESSAGE_RECEIVED]
+          example: "MESSAGE_RECEIVED"
+        message:
+          $ref: '#/components/schemas/Message'
+          example:
+            message_id: "msg-server-xyz-789"
+            conversation_id: "conv-1111-2222-3333-4444"
+            sender_id: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+            content: "Got it, thanks!"
+            message_type: "text"
+            timestamp: "2025-06-06T11:00:10Z"
+            read_by: []
+    WsTypingIndicator:
+      type: object
+      required:
+        - type
+        - conversation_id
+        - user_id
+        - is_typing
+      properties:
+        type:
+          type: string
+          enum: [TYPING_INDICATOR]
+          example: "TYPING_INDICATOR"
+        conversation_id:
+          type: string
+          format: uuid
+          example: "conv-1111-2222-3333-4444"
+        user_id:
+          type: string
+          format: uuid
+          example: "b1c2d3e4-f5a6-7890-1234-567890abcdef"
+        is_typing:
+          type: boolean
+          example: true
+    WsReadReceiptClient: # Client sends this
+      type: object
+      required:
+        - type
+        - conversation_id
+        - last_read_message_id
+      properties:
+        type:
+          type: string
+          enum: [READ_RECEIPT]
+          example: "READ_RECEIPT"
+        conversation_id:
+          type: string
+          format: uuid
+          example: "conv-1111-2222-3333-4444"
+        last_read_message_id:
+          type: string
+          format: uuid
+          description: The ID of the last message read by the user in this conversation. All prior messages are also considered read.
+          example: "msg-server-xyz-789"
+    WsMessageReadStatus: # Server sends this to inform other clients
+      type: object
+      required:
+        - type
+        - conversation_id
+        - message_id
+        - reader_id
+        - read_at
+      properties:
+        type:
+          type: string
+          enum: [MESSAGE_READ_STATUS]
+          example: "MESSAGE_READ_STATUS"
+        conversation_id:
+          type: string
+          format: uuid
+          example: "conv-1111-2222-3333-4444"
+        message_id:
+          type: string
+          format: uuid
+          description: The ID of the message that was read (or up to which was read).
+          example: "msg-server-xyz-789"
+        reader_id:
+          type: string
+          format: uuid
+          description: The ID of the user who read the message.
+          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+        read_at:
+          type: string
+          format: date-time
+          example: "2025-06-06T11:15:00Z"
+    WsPresenceUpdate:
+      type: object
+      required:
+        - type
+        - user_id
+        - status
+      properties:
+        type:
+          type: string
+          enum: [PRESENCE_UPDATE]
+          example: "PRESENCE_UPDATE"
+        user_id:
+          type: string
+          format: uuid
+          example: "d1e2f3a4-b5c6-7890-1234-567890abcdef"
+        status:
+          type: string
+          enum: [online, offline, away]
+          example: "online"
+        last_seen:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of last activity if status is offline/away
+          example: "2025-06-06T10:00:00Z"
+    WsConversationUpdate:
+      type: object
+      required:
+        - type
+        - conversation_id
+        - change_type
+      properties:
+        type:
+          type: string
+          enum: [CONVERSATION_UPDATE]
+          example: "CONVERSATION_UPDATE"
+        conversation_id:
+          type: string
+          format: uuid
+          example: "conv-group-apollo-1"
+        change_type:
+          type: string
+          enum: [name_changed, participant_added, participant_removed]
+          example: "name_changed"
+        new_name:
+          type: string
+          nullable: true
+          description: Only if change_type is 'name_changed'
+          example: "Project Artemis Team"
+        participant_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The ID of the participant added or removed.
+          example: "e1f2g3h4-i5j6-7890-1234-567890abcdef"
