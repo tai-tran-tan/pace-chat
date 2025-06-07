@@ -18,7 +18,7 @@ data class User(
     val password: String, // In a real app, this should be hashed and not returned
     var status: String, // online, offline, away
     @SerialName("avatar_url") var avatarUrl: String?,
-    var lastSeen: Instant?
+    @SerialName("last_seen") var lastSeen: Instant?
 ) {
     fun toUserPublic() = UserPublic(userId, username, avatarUrl)
     fun toUserResponse() = UserResponse(userId, username, email, status, avatarUrl, lastSeen)
@@ -213,9 +213,9 @@ sealed class WsMessage {
     data class WsMessageReadStatus(
         override val type: EventType = EventType.MESSAGE_READ_STATUS,
         @SerialName("conversation_id") val conversationId: String,
-        val messageId: String, // The specific message ID that was read (or up to which was read)
-        val readerId: String,
-        val readAt: Instant
+        @SerialName("message_id") val messageId: String, // The specific message ID that was read (or up to which was read)
+        @SerialName("reader_id") val readerId: String,
+        @SerialName("read_at") val readAt: Instant
     ) : WsMessage()
 
     @Serializable
@@ -224,7 +224,7 @@ sealed class WsMessage {
         override val type: EventType = EventType.PRESENCE_UPDATE,
         @SerialName("user_id") val userId: String,
         val status: UserStatus, // "online", "offline", "away"
-        val lastSeen: Instant?
+        @SerialName("last_seen")val lastSeen: Instant?
     ) : WsMessage()
 
     @Serializable
@@ -232,9 +232,9 @@ sealed class WsMessage {
     data class ConversationUpdate(
         override val type: EventType = EventType.CONVERSATION_UPDATE,
         @SerialName("conversation_id") val conversationId: String,
-        val changeType: String, // e.g., "name_changed", "participant_added", "participant_removed"
-        val newName: String? = null, // if changeType is "name_changed"
-        val participantId: String? = null // if changeType is "participant_added" or "participant_removed"
+        @SerialName("change_type") val changeType: String, // e.g., "name_changed", "participant_added", "participant_removed"
+        @SerialName("new_name") val newName: String? = null, // if changeType is "name_changed"
+        @SerialName("participant_id") val participantId: String? = null // if changeType is "participant_added" or "participant_removed"
     ) : WsMessage()
 
     enum class EventType {
