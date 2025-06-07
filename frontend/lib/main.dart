@@ -1443,19 +1443,18 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     }
 
                     // Check if conversation already exists
-                    final existingConv = chatProvider.conversations.firstWhere(
-                      (conv) =>
-                          conv.type == 'private' &&
-                          conv.participants.any(
-                            (p) => p.userId == _targetUserIdController.text,
-                          ) &&
-                          conv.participants.any(
-                            (p) => p.userId == currentUserId,
-                          ),
-                      orElse: () =>
-                          null
-                              as Conversation, // Use null as the "not found" value
-                    );
+                    final existingConv = chatProvider.conversations
+                        .where(
+                          (conv) =>
+                              conv.type == 'private' &&
+                              conv.participants.any(
+                                (p) => p.userId == _targetUserIdController.text,
+                              ) &&
+                              conv.participants.any(
+                                (p) => p.userId == currentUserId,
+                              ),
+                        )
+                        .firstOrNull;
 
                     if (existingConv != null) {
                       Navigator.of(dialogContext).pop(); // Close dialog

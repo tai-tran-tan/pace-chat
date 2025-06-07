@@ -37,8 +37,8 @@ class ConversationRouter(private val router: Router) {
 
         router.post("/conversations/private").coroutineHandler { rc ->
             val userId = rc.get<String>("userId")
-            val request = rc.body().asPojo(ConversationPrivateRequest::class.java)
-            val targetUser = InMemoryDatabase.findUserById(request.targetUserId)
+            val request = Json.decodeFromString<ConversationPrivateRequest>(rc.body().asString())
+            val targetUser = InMemoryDatabase.findUserById(request.targetUsername)
 
             if (targetUser == null) {
                 rc.response().setStatusCode(404).end(Json.encodeToString(mapOf("message" to "Target user not found")))

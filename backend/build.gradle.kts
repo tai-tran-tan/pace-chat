@@ -11,8 +11,8 @@ plugins {
     id("io.vertx.vertx-plugin") version "1.4.0" // Vert.x Gradle plugin
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23" // Kotlinx Serialization
     id("com.github.johnrengelman.shadow") version "7.1.2"
-    kotlin("plugin.lombok") version "2.1.21"
-    id("io.freefair.lombok") version "8.13"
+//    kotlin("plugin.lombok") version "2.1.21"
+//    id("io.freefair.lombok") version "8.13"
 }
 
 group = "com.pace"

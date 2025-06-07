@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import lombok.NoArgsConstructor
 
 // Using @Serializable for kotlinx.serialization
 
@@ -57,7 +56,6 @@ data class AuthRegisterRequest(val username: String, val email: String, val pass
 data class AuthRegisterResponse(val userId: String, val username: String, val message: String)
 
 @Serializable
-@NoArgsConstructor
 data class AuthLoginRequest @JsonCreator constructor(val username: String, val password: String)
 
 @Serializable
@@ -87,7 +85,9 @@ data class Conversation(
 )
 
 @Serializable
-data class ConversationPrivateRequest(@SerialName("target_user_id") val targetUserId: String)
+data class ConversationPrivateRequest @JsonCreator constructor(
+    @SerialName("target_username") val targetUsername: String
+)
 
 @Serializable
 data class ConversationGroupCreateRequest(
