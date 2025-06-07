@@ -12,12 +12,12 @@ import lombok.NoArgsConstructor
 // --- User Models ---
 @Serializable
 data class User(
-    val userId: String,
+    @SerialName("user_id") val userId: String,
     var username: String,
     var email: String,
     val password: String, // In a real app, this should be hashed and not returned
     var status: String, // online, offline, away
-    var avatarUrl: String?,
+    @SerialName("avatar_url") var avatarUrl: String?,
     var lastSeen: Instant?
 ) {
     fun toUserPublic() = UserPublic(userId, username, avatarUrl)
@@ -53,11 +53,12 @@ data class ProfileUpdate(
 data class AuthRegisterRequest(val username: String, val email: String, val password: String)
 
 @Serializable
+@SerialName("user_id")
 data class AuthRegisterResponse(val userId: String, val username: String, val message: String)
 
 @Serializable
 @NoArgsConstructor
-data class AuthLoginRequest @JsonCreator constructor (val username: String, val password: String)
+data class AuthLoginRequest @JsonCreator constructor(val username: String, val password: String)
 
 @Serializable
 data class AuthLoginResponse(
@@ -68,7 +69,7 @@ data class AuthLoginResponse(
 )
 
 @Serializable
-data class RefreshTokenRequest(val refreshToken: String)
+data class RefreshTokenRequest(@SerialName("refresh_token") val refreshToken: String)
 
 @Serializable
 data class RefreshTokenResponse(val token: String)
@@ -86,15 +87,18 @@ data class Conversation(
 )
 
 @Serializable
-data class ConversationPrivateRequest(val targetUserId: String)
+data class ConversationPrivateRequest(@SerialName("target_user_id") val targetUserId: String)
 
 @Serializable
-data class ConversationGroupCreateRequest(val name: String, val participantIds: List<String>)
+data class ConversationGroupCreateRequest(
+    val name: String,
+    @SerialName("participant_ids") val participantIds: List<String>
+)
 
 @Serializable
 data class ConversationGroupParticipantsUpdate(
-    val addIds: List<String> = emptyList(),
-    val removeIds: List<String> = emptyList()
+    @SerialName("add_ids") val addIds: List<String> = emptyList(),
+    @SerialName("remove_ids") val removeIds: List<String> = emptyList()
 )
 
 // --- Message Models ---
@@ -113,24 +117,24 @@ data class Message(
 @Serializable
 data class MessagesHistoryResponse(
     val messages: List<Message>,
-    val hasMore: Boolean,
-    val nextBeforeMessageId: String?
+    @SerialName("has_more") val hasMore: Boolean,
+    @SerialName("next_before_message_id") val nextBeforeMessageId: String?
 )
 
 @Serializable
 data class FileUploadResponse(
-    val fileUrl: String,
-    val fileType: String,
-    val fileSize: Long
+    @SerialName("file_url") val fileUrl: String,
+    @SerialName("file_type") val fileType: String,
+    @SerialName("file_size") val fileSize: Long
 )
 
 // --- Device Token for Push Notifications ---
 @Serializable
 data class DeviceToken(
-    val userId: String,
-    val deviceToken: String,
-    val platform: String, // "android", "ios"
-    val registeredAt: Instant
+    @SerialName("user_id") val userId: String,
+    @SerialName("device_token") val deviceToken: String,
+    @SerialName("platform") val platform: String, // "android", "ios"
+    @SerialName("registered_at") val registeredAt: Instant
 )
 
 // --- WebSocket Message Models ---
@@ -141,32 +145,41 @@ sealed class WsMessage {
 
     @Serializable
     @SerialName("AUTH")
-    data class WsAuthMessage(override val type: EventType = EventType.AUTH, val token: String) : WsMessage()
+    data class WsAuthMessage(
+        override val type: EventType = EventType.AUTH,
+        val token: String
+    ) : WsMessage()
 
     @Serializable
     @SerialName("AUTH_SUCCESS")
-    data class WsAuthSuccess(override val type: EventType = EventType.AUTH_SUCCESS, val userId: String) : WsMessage()
+    data class WsAuthSuccess(
+        override val type: EventType = EventType.AUTH_SUCCESS,
+        @SerialName("user_id") val userId: String
+    ) : WsMessage()
 
     @Serializable
     @SerialName("AUTH_FAILURE")
-    data class WsAuthFailure(override val type: EventType = EventType.AUTH_FAILURE, val reason: String) : WsMessage()
+    data class WsAuthFailure(
+        override val type: EventType = EventType.AUTH_FAILURE,
+        val reason: String
+    ) : WsMessage()
 
     @Serializable
     @SerialName("SEND_MESSAGE")
     data class SendMessage(
         override val type: EventType = EventType.SEND_MESSAGE,
-        val conversationId: String,
+        @SerialName("conversation_id") val conversationId: String,
         val content: String,
-        val messageType: String,
-        val clientMessageId: String // Client-generated ID for ACK
+        @SerialName("message_type") val messageType: String,
+        @SerialName("client_message_id") val clientMessageId: String // Client-generated ID for ACK
     ) : WsMessage()
 
     @Serializable
     @SerialName("MESSAGE_DELIVERED")
     data class MessageDelivered(
         override val type: EventType = EventType.MESSAGE_DELIVERED,
-        val clientMessageId: String, // Echoes client's ID
-        val serverMessageId: String, // Server's actual message ID
+        @SerialName("client_message_id") val clientMessageId: String, // Echoes client's ID
+        @SerialName("server_message_id") val serverMessageId: String, // Server's actual message ID
         val timestamp: Instant,
         val status: String // "success" or "failure"
     ) : WsMessage()
@@ -182,24 +195,24 @@ sealed class WsMessage {
     @SerialName("TYPING_INDICATOR")
     data class TypingIndicator(
         override val type: EventType = EventType.TYPING_INDICATOR,
-        val conversationId: String,
-        val userId: String,
-        val isTyping: Boolean
+        @SerialName("conversation_id") val conversationId: String,
+        @SerialName("user_id") val userId: String,
+        @SerialName("is_typing") val isTyping: Boolean
     ) : WsMessage()
 
     @Serializable
     @SerialName("READ_RECEIPT")
     data class ReadReceipt(
         override val type: EventType = EventType.READ_RECEIPT,
-        val conversationId: String,
-        val lastReadMessageId: String
+        @SerialName("conversation_id") val conversationId: String,
+        @SerialName("last_read_message_id") val lastReadMessageId: String
     ) : WsMessage()
 
     @Serializable
     @SerialName("MESSAGE_READ_STATUS")
     data class WsMessageReadStatus(
         override val type: EventType = EventType.MESSAGE_READ_STATUS,
-        val conversationId: String,
+        @SerialName("conversation_id") val conversationId: String,
         val messageId: String, // The specific message ID that was read (or up to which was read)
         val readerId: String,
         val readAt: Instant
@@ -209,7 +222,7 @@ sealed class WsMessage {
     @SerialName("PRESENCE_UPDATE")
     data class WsPresenceUpdate(
         override val type: EventType = EventType.PRESENCE_UPDATE,
-        val userId: String,
+        @SerialName("user_id") val userId: String,
         val status: UserStatus, // "online", "offline", "away"
         val lastSeen: Instant?
     ) : WsMessage()
@@ -218,7 +231,7 @@ sealed class WsMessage {
     @SerialName("CONVERSATION_UPDATE")
     data class ConversationUpdate(
         override val type: EventType = EventType.CONVERSATION_UPDATE,
-        val conversationId: String,
+        @SerialName("conversation_id") val conversationId: String,
         val changeType: String, // e.g., "name_changed", "participant_added", "participant_removed"
         val newName: String? = null, // if changeType is "name_changed"
         val participantId: String? = null // if changeType is "participant_added" or "participant_removed"
