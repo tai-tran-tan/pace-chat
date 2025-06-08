@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Button, Avatar, List, Divider, useTheme } from 'react-native-paper';
-import { useAuth } from '../contexts/AuthContext';
+import { useNavigation } from '@react-navigation/native';
+import type { RootStackNavigationProp } from '../types/navigation';
+import { useAuthStore } from '../store/useAuthStore';
 
 const ProfileScreen = () => {
-  const { user, logout, updateProfile, login } = useAuth();
+  const navigation = useNavigation<RootStackNavigationProp>();
+  const { user, logout, updateProfile } = useAuthStore();
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
 
@@ -23,7 +26,11 @@ const ProfileScreen = () => {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <Text>Vui lòng đăng nhập để xem thông tin cá nhân</Text>
-        <Button mode="contained" onPress={login} style={{ marginTop: 16 }}>
+        <Button 
+          mode="contained" 
+          onPress={() => navigation.navigate('Auth')} 
+          style={{ marginTop: 16 }}
+        >
           Đăng nhập
         </Button>
       </View>

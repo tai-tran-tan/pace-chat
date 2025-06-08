@@ -4,7 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { IconButton } from 'react-native-paper';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useAuthStore } from './store/useAuthStore';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Screens
 import AuthScreen from './screens/AuthScreen';
@@ -77,8 +78,8 @@ const MainTabs = () => {
 };
 
 const AppContent = () => {
-  const { isAuthenticated } = useAuth();
-  
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+
   return (
     <NavigationContainer>
       <Stack.Navigator
@@ -124,11 +125,11 @@ const AppContent = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <PaperProvider>
+    <PaperProvider>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}> 
         <AppContent />
-      </PaperProvider>
-    </AuthProvider>
+      </SafeAreaView>
+    </PaperProvider>
   );
 };
 
