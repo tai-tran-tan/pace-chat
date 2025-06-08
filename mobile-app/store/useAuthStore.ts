@@ -1,117 +1,83 @@
 import { create } from 'zustand';
-import { authApi } from '../services/api';
+import { persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../services/api';
 
 interface User {
   user_id: string;
   username: string;
+  avatar_url?: string | null;
 }
 
 interface AuthState {
   user: User | null;
+  token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string, email: string) => Promise<void>;
-  logout: () => Promise<void>;
-  checkAuth: () => Promise<void>;
-  clearError: () => void;
+  setUser: (user: User | null) => void;
+  setToken: (token: string | null) => void;
+  setRefreshToken: (refreshToken: string | null) => void;
+  login: (userData: { user: User; token: string; refresh_token: string }) => void;
+  logout: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isAuthenticated: false,
-  isLoading: false,
-  error: null,
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      token: null,
+      refreshToken: null,
+      isAuthenticated: false,
 
-  login: async (username: string, password: string) => {
-    console.log('AuthStore: Starting login process');
-    set({ isLoading: true, error: null });
-    try {
-      const data = await authApi.login(username, password);
-      console.log('AuthStore: Login successful, updating state');
-      set({
-        user: { user_id: data.user_id, username: data.username },
-        isAuthenticated: true,
-        isLoading: false,
-      });
-      console.log('AuthStore: State updated, user authenticated');
-    } catch (error: any) {
-      console.error('AuthStore: Login failed:', {
-        message: error.response?.data?.message || error.message,
-        status: error.response?.status
-      });
-      set({
-        error: error.response?.data?.message || 'Đăng nhập thất bại',
-        isLoading: false,
-      });
-      throw error;
+      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      
+      setToken: (token) => {
+        set({ token });
+        if (token) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        } else {
+          delete api.defaults.headers.common['Authorization'];
+        }
+      },
+
+      setRefreshToken: (refreshToken) => set({ refreshToken }),
+
+      login: (userData) => {
+        set({
+          user: userData.user,
+          token: userData.token,
+          refreshToken: userData.refresh_token,
+          isAuthenticated: true,
+        });
+        // Set token in axios headers
+        api.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
+      },
+
+      logout: () => {
+        set({
+          user: null,
+          token: null,
+          refreshToken: null,
+          isAuthenticated: false,
+        });
+        // Remove token from axios headers
+        delete api.defaults.headers.common['Authorization'];
+      },
+    }),
+    {
+      name: 'auth-storage',
+      storage: {
+        getItem: async (name) => {
+          const value = await AsyncStorage.getItem(name);
+          return value ? JSON.parse(value) : null;
+        },
+        setItem: async (name, value) => {
+          await AsyncStorage.setItem(name, JSON.stringify(value));
+        },
+        removeItem: async (name) => {
+          await AsyncStorage.removeItem(name);
+        },
+      },
     }
-  },
-
-  register: async (username: string, password: string, email: string) => {
-    console.log('AuthStore: Starting register process');
-    set({ isLoading: true, error: null });
-    try {
-      await authApi.register(username, password, email);
-      console.log('AuthStore: Register successful, attempting auto login');
-      // After successful registration, automatically login
-      await authApi.login(username, password);
-      const user = await authApi.getCurrentUser();
-      console.log('AuthStore: Auto login successful, updating state');
-      set({
-        user,
-        isAuthenticated: true,
-        isLoading: false,
-      });
-      console.log('AuthStore: State updated, user registered and authenticated');
-    } catch (error: any) {
-      console.error('AuthStore: Register failed:', {
-        message: error.response?.data?.message || error.message,
-        status: error.response?.status
-      });
-      set({
-        error: error.response?.data?.message || 'Registration failed',
-        isLoading: false,
-      });
-      throw error;
-    }
-  },
-
-  logout: async () => {
-    set({ isLoading: true });
-    try {
-      await authApi.logout();
-      set({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-      });
-    } catch (error: any) {
-      set({
-        error: error.message || 'Đăng xuất thất bại',
-        isLoading: false,
-      });
-    }
-  },
-
-  checkAuth: async () => {
-    set({ isLoading: true });
-    try {
-      const user = await authApi.getCurrentUser();
-      set({
-        user,
-        isAuthenticated: !!user,
-        isLoading: false,
-      });
-    } catch (error) {
-      set({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-      });
-    }
-  },
-
-  clearError: () => set({ error: null }),
-})); 
+  )
+); 

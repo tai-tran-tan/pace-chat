@@ -1,47 +1,91 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Text } from 'react-native-paper';
 
-type Props = {
+interface Props {
   text: string;
-  isMine?: boolean;
+  isMine: boolean;
+  timestamp: string;
+  isRead: boolean;
+}
+
+const MessageBubble: React.FC<Props> = ({ text, isMine, timestamp, isRead }) => {
+  return (
+    <View style={[
+      styles.container,
+      isMine ? styles.mineContainer : styles.otherContainer
+    ]}>
+      <View style={[
+        styles.bubble,
+        isMine ? styles.mineBubble : styles.otherBubble
+      ]}>
+        <Text style={[
+          styles.text,
+          isMine ? styles.mineText : styles.otherText
+        ]}>
+          {text}
+        </Text>
+      </View>
+      <View style={styles.footer}>
+        <Text style={styles.timestamp}>{timestamp}</Text>
+        {isMine && (
+          <Text style={styles.readStatus}>
+            {isRead ? '✓✓' : '✓'}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
 };
 
-const MessageBubble = ({ text, isMine }: Props) => (
-  <View
-    style={[
-      styles.bubble,
-      isMine ? styles.mine : styles.theirs,
-    ]}
-  >
-    <Text style={isMine ? styles.myText : styles.theirText}>
-      {text}
-    </Text>
-  </View>
-);
-
 const styles = StyleSheet.create({
-  bubble: {
-    padding: 10,
+  container: {
     marginVertical: 4,
-    marginHorizontal: 10,
-    borderRadius: 18,
     maxWidth: '80%',
   },
-  mine: {
+  mineContainer: {
     alignSelf: 'flex-end',
-    backgroundColor: '#007AFF',
   },
-  theirs: {
+  otherContainer: {
     alignSelf: 'flex-start',
-    backgroundColor: '#E5E5EA',
   },
-  myText: {
-    color: 'white',
-    fontSize: 16,
+  bubble: {
+    padding: 12,
+    borderRadius: 16,
+    maxWidth: '100%',
   },
-  theirText: {
-    color: '#333',
+  mineBubble: {
+    backgroundColor: '#0084ff',
+    borderBottomRightRadius: 4,
+  },
+  otherBubble: {
+    backgroundColor: '#e9e9eb',
+    borderBottomLeftRadius: 4,
+  },
+  text: {
     fontSize: 16,
+    lineHeight: 20,
+  },
+  mineText: {
+    color: '#ffffff',
+  },
+  otherText: {
+    color: '#000000',
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    marginHorizontal: 4,
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#8e8e93',
+  },
+  readStatus: {
+    fontSize: 12,
+    color: '#0084ff',
+    marginLeft: 4,
   },
 });
 

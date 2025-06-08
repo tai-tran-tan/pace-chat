@@ -6,15 +6,14 @@ export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
   Chat: {
-    chatId: string;
-    name: string;
-    avatar?: string;
+    userId: string;
+    username: string;
   };
   NewChat: undefined;
   ChatInfo: {
     chatId: string;
     name: string;
-    avatar?: string;
+    avatar: string;
   };
 };
 

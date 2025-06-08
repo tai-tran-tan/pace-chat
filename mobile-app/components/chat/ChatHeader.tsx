@@ -1,76 +1,77 @@
 // components/chat/ChatHeader.tsx
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, StyleSheet } from 'react-native';
+import { Appbar, Avatar, Text } from 'react-native-paper';
 
-type Props = {
+interface Props {
   avatar: string;
   name: string;
   status: string;
   onBack: () => void;
   onCall: () => void;
   onVideo: () => void;
-};
+  onInfo: () => void;
+}
 
-const ChatHeader = ({ avatar, name, status, onBack, onCall, onVideo }: Props) => {
+const ChatHeader: React.FC<Props> = ({
+  avatar,
+  name,
+  status,
+  onBack,
+  onCall,
+  onVideo,
+  onInfo,
+}) => {
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={onBack}>
-        <Ionicons name="arrow-back" size={24} color="#fff" />
-      </TouchableOpacity>
-
-      <Image source={{ uri: avatar }} style={styles.avatar} />
-
-      <View style={styles.userInfo}>
-        <Text style={styles.name}>{name}</Text>
-        <Text style={styles.status}>{status}</Text>
+    <Appbar.Header style={styles.header}>
+      <Appbar.BackAction onPress={onBack} />
+      <Avatar.Image
+        size={40}
+        source={{ uri: avatar }}
+        style={styles.avatar}
+      />
+      <View style={styles.titleContainer}>
+        <Text style={styles.name} numberOfLines={1}>
+          {name}
+        </Text>
+        <Text style={styles.status} numberOfLines={1}>
+          {status}
+        </Text>
       </View>
-
       <View style={styles.actions}>
-        <TouchableOpacity onPress={onCall} style={styles.icon}>
-          <Ionicons name="call-outline" size={22} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onVideo} style={styles.icon}>
-          <Ionicons name="videocam-outline" size={22} color="#fff" />
-        </TouchableOpacity>
+        <Appbar.Action icon="phone" onPress={onCall} />
+        <Appbar.Action icon="video" onPress={onVideo} />
+        <Appbar.Action icon="information" onPress={onInfo} />
       </View>
-    </View>
+    </Appbar.Header>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    height: 60,
-    backgroundColor: '#6C47FF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
+  header: {
+    backgroundColor: '#fff',
+    elevation: 0,
+    shadowOpacity: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginLeft: 10,
+    marginRight: 12,
   },
-  userInfo: {
+  titleContainer: {
     flex: 1,
-    marginLeft: 10,
+    justifyContent: 'center',
   },
   name: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   status: {
-    color: '#ddd',
     fontSize: 12,
+    color: '#666',
   },
   actions: {
     flexDirection: 'row',
-    marginLeft: 10,
-  },
-  icon: {
-    marginHorizontal: 8,
   },
 });
 

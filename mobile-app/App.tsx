@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -6,6 +6,7 @@ import { Provider as PaperProvider } from 'react-native-paper';
 import { IconButton } from 'react-native-paper';
 import { useAuthStore } from './store/useAuthStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Screens
 import AuthScreen from './screens/AuthScreen';
@@ -33,6 +34,22 @@ type MainTabParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
+
+// Tạo navigation ref để có thể truy cập từ bất kỳ đâu
+export const navigationRef = React.createRef<any>();
+
+// Export hàm navigate để sử dụng từ bất kỳ đâu
+export function navigate(name: string, params?: any) {
+  navigationRef.current?.navigate(name, params);
+}
+
+// Export hàm reset để sử dụng từ bất kỳ đâu
+export function resetToAuth() {
+  navigationRef.current?.reset({
+    index: 0,
+    routes: [{ name: 'Auth' }],
+  });
+}
 
 const MainTabs = () => {
   return (
@@ -78,20 +95,79 @@ const MainTabs = () => {
 };
 
 const AppContent = () => {
-  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const { isAuthenticated, setUser, setToken, setRefreshToken } = useAuthStore();
+
+  // Kiểm tra session khi app khởi động
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        // Kiểm tra token và user data
+        const [token, refreshToken, userData] = await Promise.all([
+          AsyncStorage.getItem('access_token'),
+          AsyncStorage.getItem('refresh_token'),
+          AsyncStorage.getItem('user')
+        ]);
+
+        if (!token || !userData) {
+          console.log('Không tìm thấy session, chuyển về màn Auth');
+          resetToAuth();
+          return;
+        }
+
+        // Parse user data
+        const user = JSON.parse(userData);
+        
+        // Cập nhật state
+        setToken(token);
+        setRefreshToken(refreshToken);
+        setUser(user);
+
+        console.log('Session đã được khôi phục:', {
+          hasToken: !!token,
+          hasRefreshToken: !!refreshToken,
+          username: user.username
+        });
+      } catch (error) {
+        console.error('Lỗi khi kiểm tra session:', error);
+        resetToAuth();
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  // Kiểm tra authentication state thay đổi
+  useEffect(() => {
+    if (!isAuthenticated) {
+      console.log('Không còn authenticated, chuyển về màn Auth');
+      resetToAuth();
+    }
+  }, [isAuthenticated]);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
         }}
       >
         {!isAuthenticated ? (
-          <Stack.Screen name="Auth" component={AuthScreen} />
+          <Stack.Screen 
+            name="Auth" 
+            component={AuthScreen}
+            options={{
+              gestureEnabled: false, // Vô hiệu hóa gesture back
+            }}
+          />
         ) : (
           <>
-            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen 
+              name="Main" 
+              component={MainTabs}
+              options={{
+                gestureEnabled: false, // Vô hiệu hóa gesture back
+              }}
+            />
             <Stack.Screen
               name="Chat"
               component={ChatScreen}

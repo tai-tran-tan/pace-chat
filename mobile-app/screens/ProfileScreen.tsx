@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Button, Avatar, List, Divider, useTheme } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
-import type { RootStackNavigationProp } from '../types/navigation';
 import { useAuthStore } from '../store/useAuthStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { resetToAuth } from '../App';
+
+// Cập nhật User type
+interface User {
+  user_id: string;
+  username: string;
+  avatar_url?: string | null;
+}
 
 const ProfileScreen = () => {
-  const navigation = useNavigation<RootStackNavigationProp>();
-  const { user, logout, updateProfile } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
 
@@ -16,6 +21,7 @@ const ProfileScreen = () => {
     setLoading(true);
     try {
       await logout();
+      resetToAuth();
     } catch (error) {
       console.error('Lỗi khi đăng xuất:', error);
     } finally {
@@ -30,7 +36,7 @@ const ProfileScreen = () => {
           <Text>Vui lòng đăng nhập để xem thông tin cá nhân</Text>
           <Button 
             mode="contained" 
-            onPress={() => navigation.navigate('Auth')} 
+            onPress={resetToAuth}
             style={{ marginTop: 16 }}
           >
             Đăng nhập
@@ -46,11 +52,13 @@ const ProfileScreen = () => {
         <View style={styles.header}>
           <Avatar.Image 
             size={100} 
-            source={{ uri: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}` }} 
+            source={{ 
+              uri: user.avatar_url || 
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username)}` 
+            }} 
             style={styles.avatar}
           />
-          <Text style={styles.name}>{user.name}</Text>
-          <Text style={styles.email}>{user.email}</Text>
+          <Text style={styles.name}>{user.username}</Text>
         </View>
 
         <List.Section>
@@ -106,10 +114,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 4,
-  },
-  email: {
-    fontSize: 16,
-    color: '#666',
   },
   logoutContainer: {
     padding: 16,
