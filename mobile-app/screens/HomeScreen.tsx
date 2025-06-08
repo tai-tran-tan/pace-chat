@@ -5,6 +5,7 @@ import { TabView, TabBar } from 'react-native-tab-view';
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackNavigationProp } from '../types/navigation';
 import ChatItem from '../components/chat/ChatItem';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type ChatTab = 'friends' | 'teachers' | 'groups';
 
@@ -96,32 +97,34 @@ const HomeScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <Searchbar
-        placeholder="Tìm kiếm..."
-        onChangeText={setSearchQuery}
-        value={searchQuery}
-        style={styles.searchBar}
-      />
+    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+      <View style={styles.container}>
+        <Searchbar
+          placeholder="Tìm kiếm..."
+          onChangeText={setSearchQuery}
+          value={searchQuery}
+          style={styles.searchBar}
+        />
 
-      <TabView
-        navigationState={{ index, routes }}
-        renderScene={renderScene}
-        renderTabBar={renderTabBar}
-        onIndexChange={(index: number) => {
-          setIndex(index);
-          setActiveTab(routes[index].key);
-        }}
-        style={styles.tabView}
-      />
+        <TabView
+          navigationState={{ index, routes }}
+          renderScene={renderScene}
+          renderTabBar={renderTabBar}
+          onIndexChange={(index: number) => {
+            setIndex(index);
+            setActiveTab(routes[index].key);
+          }}
+          style={styles.tabView}
+        />
 
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        onPress={handleNewChat}
-        label="Cuộc trò chuyện mới"
-      />
-    </View>
+        <FAB
+          icon="plus"
+          style={styles.fab}
+          onPress={handleNewChat}
+          label="Cuộc trò chuyện mới"
+        />
+      </View>
+    </SafeAreaView>
   );
 };
 

@@ -4,6 +4,7 @@ import { Text, Button, Avatar, List, Divider, useTheme } from 'react-native-pape
 import { useNavigation } from '@react-navigation/native';
 import type { RootStackNavigationProp } from '../types/navigation';
 import { useAuthStore } from '../store/useAuthStore';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ProfileScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
@@ -24,63 +25,67 @@ const ProfileScreen = () => {
 
   if (!user) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <Text>Vui lòng đăng nhập để xem thông tin cá nhân</Text>
-        <Button 
-          mode="contained" 
-          onPress={() => navigation.navigate('Auth')} 
-          style={{ marginTop: 16 }}
-        >
-          Đăng nhập
-        </Button>
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+        <View style={[styles.container, styles.centerContent]}>
+          <Text>Vui lòng đăng nhập để xem thông tin cá nhân</Text>
+          <Button 
+            mode="contained" 
+            onPress={() => navigation.navigate('Auth')} 
+            style={{ marginTop: 16 }}
+          >
+            Đăng nhập
+          </Button>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Avatar.Image 
-          size={100} 
-          source={{ uri: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}` }} 
-          style={styles.avatar}
-        />
-        <Text style={styles.name}>{user.name}</Text>
-        <Text style={styles.email}>{user.email}</Text>
-      </View>
+    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <Avatar.Image 
+            size={100} 
+            source={{ uri: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}` }} 
+            style={styles.avatar}
+          />
+          <Text style={styles.name}>{user.name}</Text>
+          <Text style={styles.email}>{user.email}</Text>
+        </View>
 
-      <List.Section>
-        <List.Item
-          title="Cập nhật thông tin"
-          left={props => <List.Icon {...props} icon="account-edit" />}
-          onPress={() => {/* TODO: Navigate to edit profile */}}
-        />
-        <Divider />
-        <List.Item
-          title="Cài đặt"
-          left={props => <List.Icon {...props} icon="cog" />}
-          onPress={() => {/* TODO: Navigate to settings */}}
-        />
-        <Divider />
-        <List.Item
-          title="Trợ giúp & Hỗ trợ"
-          left={props => <List.Icon {...props} icon="help-circle" />}
-          onPress={() => {/* TODO: Navigate to help */}}
-        />
-      </List.Section>
+        <List.Section>
+          <List.Item
+            title="Cập nhật thông tin"
+            left={props => <List.Icon {...props} icon="account-edit" />}
+            onPress={() => {/* TODO: Navigate to edit profile */}}
+          />
+          <Divider />
+          <List.Item
+            title="Cài đặt"
+            left={props => <List.Icon {...props} icon="cog" />}
+            onPress={() => {/* TODO: Navigate to settings */}}
+          />
+          <Divider />
+          <List.Item
+            title="Trợ giúp & Hỗ trợ"
+            left={props => <List.Icon {...props} icon="help-circle" />}
+            onPress={() => {/* TODO: Navigate to help */}}
+          />
+        </List.Section>
 
-      <View style={styles.logoutContainer}>
-        <Button
-          mode="outlined"
-          onPress={handleLogout}
-          loading={loading}
-          style={styles.logoutButton}
-          textColor={theme.colors.error}
-        >
-          Đăng xuất
-        </Button>
-      </View>
-    </ScrollView>
+        <View style={styles.logoutContainer}>
+          <Button
+            mode="outlined"
+            onPress={handleLogout}
+            loading={loading}
+            style={styles.logoutButton}
+            textColor={theme.colors.error}
+          >
+            Đăng xuất
+          </Button>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 

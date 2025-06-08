@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackNavigationProp, ChatInfoScreenRouteProp } from '../types/navigation';
 import { Text, Avatar, IconButton, Surface, Divider } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Participant = {
   id: string;
@@ -102,39 +103,43 @@ const ChatInfoScreen = () => {
   );
 
   return (
-    <ScrollView style={styles.container}>
-      <Surface style={styles.header}>
-        <Avatar.Image
-          source={{ uri: chatInfo.avatar }}
-          size={80}
-          style={styles.avatar}
-        />
-        <Text style={styles.chatName}>{chatInfo.name}</Text>
-      </Surface>
+    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+      <View style={styles.container}>
+        <ScrollView>
+          <Surface style={styles.header}>
+            <Avatar.Image
+              source={{ uri: chatInfo.avatar }}
+              size={80}
+              style={styles.avatar}
+            />
+            <Text style={styles.chatName}>{chatInfo.name}</Text>
+          </Surface>
 
-      <Surface style={styles.section}>
-        <Text style={styles.sectionTitle}>Thành viên ({chatInfo.participants.length})</Text>
-        <Divider style={styles.divider} />
-        {chatInfo.participants.map(renderParticipant)}
-        <TouchableOpacity style={styles.addButton}>
-          <IconButton icon="account-plus" size={24} iconColor="#2196F3" />
-          <Text style={styles.addButtonText}>Thêm thành viên</Text>
-        </TouchableOpacity>
-      </Surface>
+          <Surface style={styles.section}>
+            <Text style={styles.sectionTitle}>Thành viên ({chatInfo.participants.length})</Text>
+            <Divider style={styles.divider} />
+            {chatInfo.participants.map(renderParticipant)}
+            <TouchableOpacity style={styles.addButton}>
+              <IconButton icon="account-plus" size={24} iconColor="#2196F3" />
+              <Text style={styles.addButtonText}>Thêm thành viên</Text>
+            </TouchableOpacity>
+          </Surface>
 
-      <Surface style={styles.section}>
-        <Text style={styles.sectionTitle}>Tệp đính kèm</Text>
-        <Divider style={styles.divider} />
-        {chatInfo.media.map(renderMediaItem)}
-      </Surface>
+          <Surface style={styles.section}>
+            <Text style={styles.sectionTitle}>Tệp đính kèm</Text>
+            <Divider style={styles.divider} />
+            {chatInfo.media.map(renderMediaItem)}
+          </Surface>
 
-      <Surface style={styles.section}>
-        <TouchableOpacity style={styles.dangerButton} onPress={handleLeaveGroup}>
-          <IconButton icon="exit-to-app" size={24} iconColor="#FF5252" />
-          <Text style={styles.dangerButtonText}>Rời khỏi nhóm</Text>
-        </TouchableOpacity>
-      </Surface>
-    </ScrollView>
+          <Surface style={styles.section}>
+            <TouchableOpacity style={styles.dangerButton} onPress={handleLeaveGroup}>
+              <IconButton icon="exit-to-app" size={24} iconColor="#FF5252" />
+              <Text style={styles.dangerButtonText}>Rời khỏi nhóm</Text>
+            </TouchableOpacity>
+          </Surface>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 };
 

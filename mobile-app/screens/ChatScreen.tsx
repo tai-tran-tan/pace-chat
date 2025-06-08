@@ -6,6 +6,7 @@ import type { RootStackNavigationProp, ChatScreenRouteProp } from '../types/navi
 import ChatHeader from '../components/chat/ChatHeader';
 import MessageInput from '../components/chat/MessageInput';
 import MessageBubble from '../components/chat/MessageBubble';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Message = {
   id: string;
@@ -50,42 +51,44 @@ const ChatScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <ChatHeader
-        avatar={avatar || 'https://i.pravatar.cc/150?img=3'}
-        name={name}
-        status="online"
-        onBack={handleBack}
-        onCall={() => {}}
-        onVideo={() => {}}
-        onInfo={handleInfo}
-      />
-
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={80}
-      >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <MessageBubble
-              text={item.text}
-              isMine={item.senderId === 'me'}
-              // time={item.time}
-            />
-          )}
-          contentContainerStyle={styles.messages}
+    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+      <View style={styles.container}>
+        <ChatHeader
+          avatar={avatar || 'https://i.pravatar.cc/150?img=3'}
+          name={name}
+          status="online"
+          onBack={handleBack}
+          onCall={() => {}}
+          onVideo={() => {}}
+          onInfo={handleInfo}
         />
 
-        <MessageInput
-          onSend={handleSend}
-          onAttach={() => {}}
-        />
-      </KeyboardAvoidingView>
-    </View>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={80}
+        >
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={item => item.id}
+            renderItem={({ item }) => (
+              <MessageBubble
+                text={item.text}
+                isMine={item.senderId === 'me'}
+                // time={item.time}
+              />
+            )}
+            contentContainerStyle={styles.messages}
+          />
+
+          <MessageInput
+            onSend={handleSend}
+            onAttach={() => {}}
+          />
+        </KeyboardAvoidingView>
+      </View>
+    </SafeAreaView>
   );
 };
 
