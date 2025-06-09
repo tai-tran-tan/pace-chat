@@ -86,7 +86,7 @@ data class Conversation(
 
 @Serializable
 data class ConversationPrivateRequest @JsonCreator constructor(
-    @SerialName("target_username") val targetUsername: String
+    @SerialName("target_user_id") val targetUserId: String
 )
 
 @Serializable
