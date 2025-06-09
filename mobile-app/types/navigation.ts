@@ -5,15 +5,19 @@ import { RouteProp } from '@react-navigation/native';
 export type RootStackParamList = {
   Auth: undefined;
   Home: undefined;
-  Chat: { userId: string; username: string };
+  Chat: { conversationId?: string; userId?: string; username: string };
   NewChat: undefined;
   Profile: undefined;
+  Contact: undefined;
+  Media: undefined;
   ChatInfo: { chatId: string; name: string; avatar: string };
 };
 
 export type MainTabParamList = {
-  Home: undefined;
-  Notifications: undefined;
+  HomeTab: undefined;
+  ContactTab: undefined;
+  MediaTab: undefined;
+  ProfileTab: undefined;
 };
 
 // Navigation Props Types

@@ -3,13 +3,12 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, FlatList, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackNavigationProp, ChatScreenRouteProp } from '../types/navigation';
-import ChatHeader from '../components/chat/ChatHeader';
 import MessageInput from '../components/chat/MessageInput';
 import MessageBubble from '../components/chat/MessageBubble';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import socketService from '../services/socket';
 import { useAuthStore } from '../store/useAuthStore';
 import { useWebSocketManager } from '../hooks/useWebSocketManager';
+import { useChatHeader } from '../contexts/ChatHeaderContext';
 import api from '../services/api';
 import { Button } from 'react-native-paper';
 
@@ -47,15 +46,17 @@ type Conversation = {
 };
 
 type ChatScreenParams = {
-  userId: string;
+  conversationId?: string;
+  userId?: string;
   username: string;
 };
 
 const ChatScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
   const route = useRoute<ChatScreenRouteProp>();
-  const { userId, username } = route.params as ChatScreenParams;
+  const { conversationId, userId, username } = route.params as ChatScreenParams;
   const { user } = useAuthStore();
+  const { setChatHeaderProps, clearChatHeaderProps } = useChatHeader();
 
   // Use WebSocket manager for this chat screen
   const { isConnected: wsConnected, resetIdleTimer } = useWebSocketManager({
@@ -66,7 +67,7 @@ const ChatScreen = () => {
 
   // States
   const [conversation, setConversation] = useState<Conversation | null>(null);
-  const [chatId, setChatId] = useState<string | null>(null);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,25 +78,58 @@ const ChatScreen = () => {
 
   const flatListRef = useRef<FlatList>(null);
 
+  // Set up ChatHeader when component mounts
+  useEffect(() => {
+    setChatHeaderProps({
+      chatAvatar: conversation?.type === 'private' 
+        ? conversation.participants.find(p => p.user_id !== user?.user_id)?.avatar_url || `https://i.pravatar.cc/150?img=${currentConversationId}`
+        : "https://i.pravatar.cc/150?img=group",
+      chatName: username,
+      chatStatus: isTyping ? 'typing...' : wsConnected ? 'online' : 'connecting...',
+      onChatBack: handleBack,
+      onChatCall: () => {},
+      onChatVideo: () => {},
+      onChatInfo: () => {
+        if (conversation) {
+          navigation.navigate('ChatInfo', {
+            chatId: conversation.conversation_id,
+            name: username,
+            avatar: conversation?.type === 'private' 
+              ? conversation.participants.find(p => p.user_id !== user?.user_id)?.avatar_url || `https://i.pravatar.cc/150?img=${currentConversationId}`
+              : "https://i.pravatar.cc/150?img=group",
+          });
+        }
+      }
+    });
+
+    // Clean up when component unmounts
+    return () => {
+      clearChatHeaderProps();
+    };
+  }, [currentConversationId, username, isTyping, wsConnected, conversation, user?.user_id]);
+
+  // Update chat status when typing or connection status changes
+  useEffect(() => {
+    setChatHeaderProps({
+      chatStatus: isTyping ? 'typing...' : wsConnected ? 'online' : 'connecting...'
+    });
+  }, [isTyping, wsConnected]);
+
+  // Auto scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0 && flatListRef.current) {
+      // Small delay to ensure the message is rendered
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages.length]);
+
   // Initialize conversation
   const initializeConversation = useCallback(async () => {
-    if (!userId) {
-      console.error('No target user ID provided');
-      setError('User not found');
-      return;
-    }
-
     if (!user?.user_id) {
       console.error('Current user not logged in');
       setError('Please login to continue');
-      return;
-    }
-
-    // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(userId)) {
-      console.error('Invalid user ID format:', userId);
-      setError('Invalid user ID format');
       return;
     }
 
@@ -103,32 +137,46 @@ const ChatScreen = () => {
       setIsLoading(true);
       setError(null);
 
-      console.log('Initializing conversation:', {
+      let finalConversationId = conversationId;
+
+      // If we have userId but no conversationId, create a new conversation
+      if (userId && !conversationId) {
+        console.log('Creating new conversation with user:', {
+          targetUserId: userId,
+          currentUserId: user.user_id
+        });
+
+        const createResponse = await api.post('/conversations/private', {
+          target_user_id: userId
+        });
+
+        console.log('New conversation created:', createResponse.data);
+        finalConversationId = createResponse.data.conversation_id;
+        if (finalConversationId) {
+          setCurrentConversationId(finalConversationId);
+        }
+      } else if (conversationId) {
+        setCurrentConversationId(conversationId);
+      } else {
+        throw new Error('Neither conversationId nor userId provided');
+      }
+
+      console.log('Loading conversation:', {
+        conversationId: finalConversationId,
         currentUserId: user.user_id,
-        targetUserId: userId,
         token: api.defaults.headers.common['Authorization'] ? 'Present' : 'Missing'
       });
 
-      const requestData = {
-        target_user_id: userId
-      };
+      // Get conversation details
+      const conversationResponse = await api.get(`/conversations/${finalConversationId}`);
+      const conversationData = conversationResponse.data;
+      
+      console.log('Conversation response:', conversationData);
 
-      console.log('Request payload:', requestData);
-
-      const response = await api.post('/conversations/private', requestData, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-
-      console.log('Conversation response:', response.data);
-
-      if (!response.data || !response.data.conversation_id) {
+      if (!conversationData || !conversationData.conversation_id) {
         throw new Error('Invalid response format from server');
       }
 
-      const conversationData = response.data;
       setConversation({
         conversation_id: conversationData.conversation_id,
         type: conversationData.type,
@@ -138,62 +186,27 @@ const ChatScreen = () => {
         last_message_timestamp: conversationData.last_message_timestamp,
         unread_count: conversationData.unread_count
       });
-      setChatId(conversationData.conversation_id);
-    } catch (error: any) {
-      console.error('Error initializing conversation:', {
-        error: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        headers: error.response?.headers,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          headers: error.config?.headers,
-          data: error.config?.data
-        }
-      });
 
-      let errorMessage = 'Unable to initialize conversation. ';
-      
-      if (error.response) {
-        const serverError = error.response.data;
-        console.log('Server error details:', serverError);
-        
-        if (typeof serverError === 'object' && serverError.message) {
-          errorMessage += serverError.message;
-        } else if (error.response.status === 401) {
-          errorMessage += 'Login session expired. Please login again.';
-        } else if (error.response.status === 404) {
-          errorMessage += 'User not found.';
-        } else if (error.response.status === 500) {
-          errorMessage += 'Server error. Please try again later.';
-        } else {
-          errorMessage += `Server error: ${error.response.status}`;
-        }
-      } else if (error.request) {
-        errorMessage += 'No response from server. Please check your connection.';
-      } else {
-        errorMessage += error.message || 'Unknown error';
-      }
-      
-      setError(errorMessage);
+    } catch (error: any) {
+      console.error('Failed to initialize conversation:', error);
+      setError('Failed to load conversation. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [userId, user?.user_id]);
+  }, [conversationId, userId, user?.user_id]);
 
-  // Initialize conversation when component mounts
+  // Initialize conversation on mount
   useEffect(() => {
     initializeConversation();
   }, [initializeConversation]);
 
   // Load messages
   const loadMessages = async (beforeMessageId?: string) => {
-    if (!chatId) return;
+    if (!currentConversationId) return;
 
     try {
       setIsLoading(true);
-      const response = await api.get(`/conversations/${chatId}/messages`, {
+      const response = await api.get(`/conversations/${currentConversationId}/messages`, {
         params: {
           limit: 20,
           before_message_id: beforeMessageId
@@ -206,7 +219,7 @@ const ChatScreen = () => {
         return {
           ...msg,
           sender_name: sender?.username || (msg.sender_id === user?.user_id ? user.username : username),
-          sender_avatar: sender?.avatar_url || (msg.sender_id === user?.user_id ? user.avatar_url : `https://i.pravatar.cc/150?img=${userId}`),
+          sender_avatar: sender?.avatar_url || (msg.sender_id === user?.user_id ? user.avatar_url : `https://i.pravatar.cc/150?img=${msg.sender_id}`),
         };
       });
       
@@ -224,10 +237,10 @@ const ChatScreen = () => {
 
   // Load messages when conversation is ready
   useEffect(() => {
-    if (chatId) {
+    if (conversation) {
       loadMessages();
     }
-  }, [chatId]);
+  }, [conversation]);
 
   // WebSocket message handling
   useEffect(() => {
@@ -237,15 +250,19 @@ const ChatScreen = () => {
       
       switch (message.type) {
         case 'MESSAGE_RECEIVED':
-          if (message.message.conversation_id === chatId) {
+          if (message.message.conversation_id === currentConversationId) {
             setMessages(prev => [...prev, message.message]);
             // Mark message as read
-            socketService.sendReadReceipt(chatId, message.message.message_id);
+            socketService.sendReadReceipt(currentConversationId, message.message.message_id);
+            // Auto scroll to bottom for new received messages
+            setTimeout(() => {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }, 100);
           }
           break;
 
         case 'TYPING_INDICATOR':
-          if (message.conversation_id === chatId && message.user_id !== user?.user_id) {
+          if (message.conversation_id === currentConversationId && message.user_id !== user?.user_id) {
             setIsTyping(message.is_typing);
           }
           break;
@@ -284,10 +301,10 @@ const ChatScreen = () => {
       unsubscribeError();
       unsubscribeConnect();
     };
-  }, [chatId, user?.user_id, resetIdleTimer]);
+  }, [currentConversationId, user?.user_id, resetIdleTimer]);
 
   const handleSend = async (text: string) => {
-    if (!text.trim() || isSending || !chatId) return;
+    if (!text.trim() || isSending || !currentConversationId) return;
 
     // Reset idle timer on user activity
     resetIdleTimer();
@@ -299,7 +316,7 @@ const ChatScreen = () => {
       // Optimistically add message to UI
       const tempMessage: Message = {
         message_id: tempMessageId,
-        conversation_id: chatId,
+        conversation_id: currentConversationId,
         sender_id: user?.user_id || '',
         content: text,
         message_type: 'text',
@@ -310,10 +327,14 @@ const ChatScreen = () => {
       };
       
       setMessages(prev => [...prev, tempMessage]);
-      flatListRef.current?.scrollToEnd({ animated: true });
+      
+      // Scroll to bottom immediately after adding message
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 50);
 
       // Send message through WebSocket
-      const serverMessageId = await socketService.sendMessage(chatId, text);
+      const serverMessageId = await socketService.sendMessage(currentConversationId, text);
       
       // Update message with server ID
       setMessages(prev => prev.map(msg => 
@@ -332,12 +353,12 @@ const ChatScreen = () => {
   };
 
   const handleTyping = (isTyping: boolean) => {
-    if (!chatId) return;
+    if (!currentConversationId) return;
     
     // Reset idle timer on typing activity
     resetIdleTimer();
     
-    socketService.sendTypingIndicator(chatId, isTyping);
+    socketService.sendTypingIndicator(currentConversationId, isTyping);
   };
 
   const handleLoadMore = () => {
@@ -352,7 +373,7 @@ const ChatScreen = () => {
 
   if (error) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
         <View style={{ padding: 24, backgroundColor: '#ffeaea', borderRadius: 12, alignItems: 'center', maxWidth: 320 }}>
           <Text style={{ color: '#d32f2f', fontWeight: 'bold', fontSize: 16, marginBottom: 12, textAlign: 'center' }}>
             {error}
@@ -361,87 +382,75 @@ const ChatScreen = () => {
             Try Again
           </Button>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
-  if (!conversation || !chatId) {
+  if (!conversation) {
     // Initializing or no conversation yet, show loading only
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
         <ActivityIndicator size="large" color="#2196F3" />
         <Text style={{ marginTop: 16, color: '#666' }}>Initializing conversation...</Text>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F8F8' }} edges={['top', 'left', 'right', 'bottom']}>
-      <View style={styles.container}>
-        <ChatHeader
-          avatar={`https://i.pravatar.cc/150?img=${userId}`}
-          name={username}
-          status={isTyping ? 'typing...' : wsConnected ? 'online' : 'connecting...'}
-          onBack={handleBack}
-          onCall={() => {}}
-          onVideo={() => {}}
-          onInfo={() => {
-            if (conversation) {
-              navigation.navigate('ChatInfo', {
-                chatId: conversation.conversation_id,
-                name: username,
-                avatar: `https://i.pravatar.cc/150?img=${userId}`,
-              });
+    <View style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={80}
+      >
+        {isLoading && messages.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={item => item.message_id}
+            renderItem={({ item }) => (
+              <MessageBubble
+                text={item.content}
+                isMine={item.sender_id === user?.user_id}
+                timestamp={new Date(item.timestamp).toLocaleTimeString([], { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })}
+                isRead={item.read_by.length > 0}
+              />
+            )}
+            contentContainerStyle={[
+              styles.messages,
+              messages.length === 0 && { flex: 1, justifyContent: 'center' }
+            ]}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              isLoading && messages.length > 0 ? (
+                <ActivityIndicator style={styles.loadingMore} />
+              ) : null
             }
-          }}
-        />
-
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={80}
-        >
-          {isLoading && messages.length === 0 ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" />
-            </View>
-          ) : (
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              keyExtractor={item => item.message_id}
-              renderItem={({ item }) => (
-                <MessageBubble
-                  text={item.content}
-                  isMine={item.sender_id === user?.user_id}
-                  timestamp={new Date(item.timestamp).toLocaleTimeString([], { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
-                  isRead={item.read_by.length > 0}
-                />
-              )}
-              contentContainerStyle={styles.messages}
-              onEndReached={handleLoadMore}
-              onEndReachedThreshold={0.5}
-              ListFooterComponent={
-                isLoading && messages.length > 0 ? (
-                  <ActivityIndicator style={styles.loadingMore} />
-                ) : null
-              }
-              inverted={false}
-            />
-          )}
-
-          <MessageInput
-            onSend={handleSend}
-            onAttach={() => {}}
-            onTyping={handleTyping}
-            disabled={isSending || !chatId || !wsConnected}
+            inverted={false}
+            showsVerticalScrollIndicator={false}
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+              autoscrollToTopThreshold: 10,
+            }}
           />
-        </KeyboardAvoidingView>
-      </View>
-    </SafeAreaView>
+        )}
+
+        <MessageInput
+          onSend={handleSend}
+          onAttach={() => {}}
+          onTyping={handleTyping}
+          disabled={isSending || !currentConversationId || !wsConnected}
+        />
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 

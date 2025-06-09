@@ -12,12 +12,7 @@ import api from './services/api';
 
 // Screens
 import AuthScreen from './screens/AuthScreen';
-import HomeScreen from './screens/HomeScreen';
-import ChatScreen from './screens/ChatScreen';
-import NewChatScreen from './screens/NewChatScreen';
-import ProfileScreen from './screens/ProfileScreen';
-import ChatInfoScreen from './screens/ChatInfoScreen';
-import MainTabs from './screens/MainTabs';
+import MainNavigator from './components/common/MainNavigator';
 
 // Types
 import type { RootStackParamList } from './types/navigation';
@@ -121,12 +116,7 @@ const App = () => {
               {!isAuthenticated ? (
                 <Stack.Screen name="Auth" component={AuthScreen} />
               ) : (
-                <>
-                  <Stack.Screen name="Main" component={MainTabs} />
-                  <Stack.Screen name="Chat" component={ChatScreen} />
-                  <Stack.Screen name="NewChat" component={NewChatScreen} />
-                  <Stack.Screen name="ChatInfo" component={ChatInfoScreen} />
-                </>
+                <Stack.Screen name="Main" component={MainNavigator} />
               )}
             </Stack.Navigator>
           </NavigationContainer>
