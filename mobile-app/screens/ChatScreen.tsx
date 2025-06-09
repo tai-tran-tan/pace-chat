@@ -110,7 +110,7 @@ const ChatScreen = () => {
       });
 
       const requestData = {
-        target_username: userId
+        target_user_id: userId
       };
 
       console.log('Request payload:', requestData);
