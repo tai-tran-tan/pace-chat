@@ -27,18 +27,18 @@ const ChatInfoScreen = () => {
 
   // Mock data - replace with real data later
   const chatInfo = {
-    name: name || 'Nhóm học tập Toán',
+    name: name || 'Math Study Group',
     avatar: avatar || 'https://i.pravatar.cc/150?img=3',
     participants: [
       {
         id: '1',
-        name: 'Nguyễn Văn A',
+        name: 'Nguyen Van A',
         avatar: 'https://i.pravatar.cc/150?img=1',
         role: 'admin' as const,
       },
       {
         id: '2',
-        name: 'Giáo viên B',
+        name: 'Teacher B',
         avatar: 'https://i.pravatar.cc/150?img=2',
         role: 'member' as const,
       },
@@ -48,14 +48,14 @@ const ChatInfoScreen = () => {
         id: '1',
         type: 'image' as const,
         url: 'https://picsum.photos/200',
-        name: 'Bài tập 1.jpg',
+        name: 'Homework 1.jpg',
         timestamp: '2 days ago',
       },
       {
         id: '2',
         type: 'file' as const,
         url: '#',
-        name: 'Tài liệu học tập.pdf',
+        name: 'Study Materials.pdf',
         timestamp: '1 week ago',
       },
     ] as MediaItem[],
@@ -67,7 +67,7 @@ const ChatInfoScreen = () => {
 
   const handleLeaveGroup = () => {
     // TODO: Implement leave group logic
-    navigation.navigate('Main');
+    navigation.navigate('Home');
   };
 
   const renderParticipant = (participant: Participant) => (
@@ -76,7 +76,7 @@ const ChatInfoScreen = () => {
       <View style={styles.participantInfo}>
         <Text style={styles.participantName}>{participant.name}</Text>
         <Text style={styles.participantRole}>
-          {participant.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
+          {participant.role === 'admin' ? 'Admin' : 'Member'}
         </Text>
       </View>
       <IconButton icon="dots-vertical" size={24} />
@@ -103,7 +103,7 @@ const ChatInfoScreen = () => {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f5f5' }} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.container}>
         <ScrollView>
           <Surface style={styles.header}>
@@ -116,17 +116,17 @@ const ChatInfoScreen = () => {
           </Surface>
 
           <Surface style={styles.section}>
-            <Text style={styles.sectionTitle}>Thành viên ({chatInfo.participants.length})</Text>
+            <Text style={styles.sectionTitle}>Members ({chatInfo.participants.length})</Text>
             <Divider style={styles.divider} />
             {chatInfo.participants.map(renderParticipant)}
             <TouchableOpacity style={styles.addButton}>
               <IconButton icon="account-plus" size={24} iconColor="#2196F3" />
-              <Text style={styles.addButtonText}>Thêm thành viên</Text>
+              <Text style={styles.addButtonText}>Add Member</Text>
             </TouchableOpacity>
           </Surface>
 
           <Surface style={styles.section}>
-            <Text style={styles.sectionTitle}>Tệp đính kèm</Text>
+            <Text style={styles.sectionTitle}>Attachments</Text>
             <Divider style={styles.divider} />
             {chatInfo.media.map(renderMediaItem)}
           </Surface>
@@ -134,7 +134,7 @@ const ChatInfoScreen = () => {
           <Surface style={styles.section}>
             <TouchableOpacity style={styles.dangerButton} onPress={handleLeaveGroup}>
               <IconButton icon="exit-to-app" size={24} iconColor="#FF5252" />
-              <Text style={styles.dangerButtonText}>Rời khỏi nhóm</Text>
+              <Text style={styles.dangerButtonText}>Leave Group</Text>
             </TouchableOpacity>
           </Surface>
         </ScrollView>

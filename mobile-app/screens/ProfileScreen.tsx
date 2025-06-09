@@ -1,29 +1,43 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Button, Avatar, List, Divider, useTheme } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store/useAuthStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { resetToAuth } from '../App';
+import { useWebSocketManager } from '../hooks/useWebSocketManager';
+import ConnectionStatus from '../components/common/ConnectionStatus';
+import type { RootStackNavigationProp } from '../types/navigation';
 
-// Cập nhật User type
+// Update User type
 interface User {
   user_id: string;
   username: string;
   avatar_url?: string | null;
+  email?: string;
 }
 
 const ProfileScreen = () => {
+  const navigation = useNavigation<RootStackNavigationProp>();
   const { user, logout } = useAuthStore();
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
+
+  // Monitor WebSocket connection status
+  const { isConnected: wsConnected } = useWebSocketManager({
+    autoConnect: false, // Just monitor, don't control connection
+    enableIdleDisconnect: false
+  });
 
   const handleLogout = async () => {
     setLoading(true);
     try {
       await logout();
-      resetToAuth();
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Auth' }],
+      });
     } catch (error) {
-      console.error('Lỗi khi đăng xuất:', error);
+      console.error('Logout failed:', error);
     } finally {
       setLoading(false);
     }
@@ -33,13 +47,13 @@ const ProfileScreen = () => {
     return (
       <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
         <View style={[styles.container, styles.centerContent]}>
-          <Text>Vui lòng đăng nhập để xem thông tin cá nhân</Text>
+          <Text>Please login to view your profile information</Text>
           <Button 
             mode="contained" 
-            onPress={resetToAuth}
+            onPress={() => navigation.navigate('Auth')}
             style={{ marginTop: 16 }}
           >
-            Đăng nhập
+            Login
           </Button>
         </View>
       </SafeAreaView>
@@ -47,7 +61,7 @@ const ProfileScreen = () => {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right', 'bottom']}>
       <ScrollView style={styles.container}>
         <View style={styles.header}>
           <Avatar.Image 
@@ -59,23 +73,30 @@ const ProfileScreen = () => {
             style={styles.avatar}
           />
           <Text style={styles.name}>{user.username}</Text>
+          <Text style={styles.email}>{user?.email || 'No email'}</Text>
+        </View>
+
+        {/* Connection Status */}
+        <View style={styles.statusSection}>
+          <Text style={styles.sectionTitle}>Connection Status</Text>
+          <ConnectionStatus showDetails={true} />
         </View>
 
         <List.Section>
           <List.Item
-            title="Cập nhật thông tin"
+            title="Update Profile"
             left={props => <List.Icon {...props} icon="account-edit" />}
             onPress={() => {/* TODO: Navigate to edit profile */}}
           />
           <Divider />
           <List.Item
-            title="Cài đặt"
+            title="Settings"
             left={props => <List.Icon {...props} icon="cog" />}
             onPress={() => {/* TODO: Navigate to settings */}}
           />
           <Divider />
           <List.Item
-            title="Trợ giúp & Hỗ trợ"
+            title="Help & Support"
             left={props => <List.Icon {...props} icon="help-circle" />}
             onPress={() => {/* TODO: Navigate to help */}}
           />
@@ -89,7 +110,7 @@ const ProfileScreen = () => {
             style={styles.logoutButton}
             textColor={theme.colors.error}
           >
-            Đăng xuất
+            Logout
           </Button>
         </View>
       </ScrollView>
@@ -126,6 +147,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  email: {
+    fontSize: 16,
+  },
+  statusSection: {
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
   },
 });
 

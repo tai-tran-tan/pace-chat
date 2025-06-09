@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { RootStackNavigationProp } from '../types/navigation';
 import ChatItem from '../components/chat/ChatItem';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useWebSocketManager } from '../hooks/useWebSocketManager';
 
 type ChatTab = 'friends' | 'teachers' | 'groups';
 
@@ -25,30 +26,35 @@ type Route = {
 
 const HomeScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
-  const [activeTab, setActiveTab] = useState<ChatTab>('friends');
   const [searchQuery, setSearchQuery] = useState('');
-  const [index, setIndex] = useState(0);
+
+  // Use WebSocket manager with idle disconnect for home screen
+  const { isConnected: wsConnected } = useWebSocketManager({
+    autoConnect: true, // Auto connect when entering home screen
+    idleTimeout: 3 * 60 * 1000, // 3 minutes for home screen (shorter than chat)
+    enableIdleDisconnect: true
+  });
 
   const routes: Route[] = [
-    { key: 'friends', title: 'Bạn bè' },
-    { key: 'teachers', title: 'Giáo viên' },
-    { key: 'groups', title: 'Nhóm' },
+    { key: 'friends', title: 'Friends' },
+    { key: 'teachers', title: 'Teachers' },
+    { key: 'groups', title: 'Groups' },
   ];
 
   // Mock data - replace with real data later
   const mockChats: ChatItem[] = [
     {
       id: '1',
-      name: 'Nguyễn Văn A',
-      lastMessage: 'Xin chào!',
+      name: 'Nguyen Van A',
+      lastMessage: 'Hello!',
       timestamp: '10:30 AM',
       unreadCount: 2,
       avatar: 'https://i.pravatar.cc/150?img=1',
     },
     {
       id: '2',
-      name: 'Giáo viên B',
-      lastMessage: 'Bài tập về nhà...',
+      name: 'Teacher B',
+      lastMessage: 'Homework assignment...',
       timestamp: 'Yesterday',
       unreadCount: 0,
       avatar: 'https://i.pravatar.cc/150?img=2',
@@ -57,9 +63,8 @@ const HomeScreen = () => {
 
   const handleChatPress = (chat: ChatItem) => {
     navigation.navigate('Chat', {
-      chatId: chat.id,
-      name: chat.name,
-      avatar: chat.avatar,
+      userId: chat.id,
+      username: chat.name,
     });
   };
 
@@ -87,41 +92,20 @@ const HomeScreen = () => {
     />
   );
 
-  const renderTabBar = (props: any) => (
-    <TabBar
-      {...props}
-      indicatorStyle={{ backgroundColor: '#2196F3' }}
-      style={{ backgroundColor: '#fff' }}
-      labelStyle={{ color: '#000' }}
-    />
-  );
-
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.container}>
         <Searchbar
-          placeholder="Tìm kiếm..."
+          placeholder="Search..."
           onChangeText={setSearchQuery}
           value={searchQuery}
-          style={styles.searchBar}
+          style={[styles.searchBar, { marginTop: 8 }]}
         />
-
-        <TabView
-          navigationState={{ index, routes }}
-          renderScene={renderScene}
-          renderTabBar={renderTabBar}
-          onIndexChange={(index: number) => {
-            setIndex(index);
-            setActiveTab(routes[index].key);
-          }}
-          style={styles.tabView}
-        />
-
         <FAB
           icon="plus"
           style={styles.fab}
           onPress={handleNewChat}
-          label="Cuộc trò chuyện mới"
+          label="New Chat"
         />
       </View>
     </SafeAreaView>

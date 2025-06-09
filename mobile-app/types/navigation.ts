@@ -1,20 +1,14 @@
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RouteProp } from '@react-navigation/native';
 
 export type RootStackParamList = {
   Auth: undefined;
-  Main: undefined;
-  Chat: {
-    userId: string;
-    username: string;
-  };
+  Home: undefined;
+  Chat: { userId: string; username: string };
   NewChat: undefined;
-  ChatInfo: {
-    chatId: string;
-    name: string;
-    avatar: string;
-  };
+  Profile: undefined;
+  ChatInfo: { chatId: string; name: string; avatar: string };
 };
 
 export type MainTabParamList = {

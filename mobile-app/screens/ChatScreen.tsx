@@ -9,6 +9,7 @@ import MessageBubble from '../components/chat/MessageBubble';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import socketService from '../services/socket';
 import { useAuthStore } from '../store/useAuthStore';
+import { useWebSocketManager } from '../hooks/useWebSocketManager';
 import api from '../services/api';
 import { Button } from 'react-native-paper';
 
@@ -56,6 +57,13 @@ const ChatScreen = () => {
   const { userId, username } = route.params as ChatScreenParams;
   const { user } = useAuthStore();
 
+  // Use WebSocket manager for this chat screen
+  const { isConnected: wsConnected, resetIdleTimer } = useWebSocketManager({
+    autoConnect: true, // Auto connect when entering chat screen
+    idleTimeout: 10 * 60 * 1000, // 10 minutes for chat screen (longer than default)
+    enableIdleDisconnect: true
+  });
+
   // States
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
@@ -73,13 +81,13 @@ const ChatScreen = () => {
   const initializeConversation = useCallback(async () => {
     if (!userId) {
       console.error('No target user ID provided');
-      setError('Không tìm thấy người dùng');
+      setError('User not found');
       return;
     }
 
     if (!user?.user_id) {
       console.error('Current user not logged in');
-      setError('Vui lòng đăng nhập để tiếp tục');
+      setError('Please login to continue');
       return;
     }
 
@@ -87,7 +95,7 @@ const ChatScreen = () => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(userId)) {
       console.error('Invalid user ID format:', userId);
-      setError('ID người dùng không hợp lệ');
+      setError('Invalid user ID format');
       return;
     }
 
@@ -102,7 +110,7 @@ const ChatScreen = () => {
       });
 
       const requestData = {
-        target_user_id: userId
+        target_username: userId
       };
 
       console.log('Request payload:', requestData);
@@ -145,7 +153,7 @@ const ChatScreen = () => {
         }
       });
 
-      let errorMessage = 'Không thể khởi tạo cuộc trò chuyện. ';
+      let errorMessage = 'Unable to initialize conversation. ';
       
       if (error.response) {
         const serverError = error.response.data;
@@ -154,18 +162,18 @@ const ChatScreen = () => {
         if (typeof serverError === 'object' && serverError.message) {
           errorMessage += serverError.message;
         } else if (error.response.status === 401) {
-          errorMessage += 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+          errorMessage += 'Login session expired. Please login again.';
         } else if (error.response.status === 404) {
-          errorMessage += 'Không tìm thấy người dùng.';
+          errorMessage += 'User not found.';
         } else if (error.response.status === 500) {
-          errorMessage += 'Lỗi server. Vui lòng thử lại sau.';
+          errorMessage += 'Server error. Please try again later.';
         } else {
-          errorMessage += `Lỗi server: ${error.response.status}`;
+          errorMessage += `Server error: ${error.response.status}`;
         }
       } else if (error.request) {
-        errorMessage += 'Không có phản hồi từ server. Vui lòng kiểm tra kết nối.';
+        errorMessage += 'No response from server. Please check your connection.';
       } else {
-        errorMessage += error.message || 'Lỗi không xác định';
+        errorMessage += error.message || 'Unknown error';
       }
       
       setError(errorMessage);
@@ -224,6 +232,9 @@ const ChatScreen = () => {
   // WebSocket message handling
   useEffect(() => {
     const unsubscribe = socketService.onMessage((message) => {
+      // Reset idle timer on any message activity
+      resetIdleTimer();
+      
       switch (message.type) {
         case 'MESSAGE_RECEIVED':
           if (message.message.conversation_id === chatId) {
@@ -273,10 +284,13 @@ const ChatScreen = () => {
       unsubscribeError();
       unsubscribeConnect();
     };
-  }, [chatId, user?.user_id]);
+  }, [chatId, user?.user_id, resetIdleTimer]);
 
   const handleSend = async (text: string) => {
     if (!text.trim() || isSending || !chatId) return;
+
+    // Reset idle timer on user activity
+    resetIdleTimer();
 
     const tempMessageId = `temp_${Date.now()}`;
     try {
@@ -319,6 +333,10 @@ const ChatScreen = () => {
 
   const handleTyping = (isTyping: boolean) => {
     if (!chatId) return;
+    
+    // Reset idle timer on typing activity
+    resetIdleTimer();
+    
     socketService.sendTypingIndicator(chatId, isTyping);
   };
 
@@ -340,7 +358,7 @@ const ChatScreen = () => {
             {error}
           </Text>
           <Button mode="contained" onPress={initializeConversation} style={{ marginTop: 8 }}>
-            Thử lại
+            Try Again
           </Button>
         </View>
       </SafeAreaView>
@@ -348,22 +366,22 @@ const ChatScreen = () => {
   }
 
   if (!conversation || !chatId) {
-    // Đang khởi tạo hoặc chưa có conversation, chỉ hiện loading
+    // Initializing or no conversation yet, show loading only
     return (
       <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
         <ActivityIndicator size="large" color="#2196F3" />
-        <Text style={{ marginTop: 16, color: '#666' }}>Đang khởi tạo cuộc trò chuyện...</Text>
+        <Text style={{ marginTop: 16, color: '#666' }}>Initializing conversation...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F8F8' }} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.container}>
         <ChatHeader
           avatar={`https://i.pravatar.cc/150?img=${userId}`}
           name={username}
-          status={isTyping ? 'typing...' : 'online'}
+          status={isTyping ? 'typing...' : wsConnected ? 'online' : 'connecting...'}
           onBack={handleBack}
           onCall={() => {}}
           onVideo={() => {}}
@@ -419,7 +437,7 @@ const ChatScreen = () => {
             onSend={handleSend}
             onAttach={() => {}}
             onTyping={handleTyping}
-            disabled={isSending || !chatId}
+            disabled={isSending || !chatId || !wsConnected}
           />
         </KeyboardAvoidingView>
       </View>

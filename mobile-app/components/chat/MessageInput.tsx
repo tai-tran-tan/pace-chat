@@ -17,7 +17,7 @@ const MessageInput: React.FC<Props> = ({
   disabled = false 
 }) => {
   const [text, setText] = useState('');
-  const typingTimeoutRef = React.useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const handleTextChange = (newText: string) => {
     setText(newText);

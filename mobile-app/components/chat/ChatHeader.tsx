@@ -23,7 +23,7 @@ const ChatHeader: React.FC<Props> = ({
   onInfo,
 }) => {
   return (
-    <Appbar.Header style={styles.header}>
+    <Appbar.Header style={styles.header} statusBarHeight={0}>
       <Appbar.BackAction onPress={onBack} />
       <Avatar.Image
         size={40}

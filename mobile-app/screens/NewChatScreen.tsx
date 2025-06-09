@@ -5,6 +5,7 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
 import {
   Searchbar,
@@ -111,20 +112,20 @@ const NewChatScreen: React.FC = () => {
 
       setSections([
         {
-          title: 'Gần đây',
+          title: 'Recent',
           data: recentUsers
         }
       ]);
     } catch (error: any) {
       console.error('Error loading users:', error);
-      let errorMessage = 'Không thể tải danh sách người dùng. ';
+      let errorMessage = 'Unable to load user list. ';
       
       if (error.response) {
-        errorMessage += error.response.data.message || `Lỗi server: ${error.response.status}`;
+        errorMessage += error.response.data.message || `Server error: ${error.response.status}`;
       } else if (error.request) {
-        errorMessage += 'Không có phản hồi từ server';
+        errorMessage += 'No response from server';
       } else {
-        errorMessage += error.message || 'Lỗi không xác định';
+        errorMessage += error.message || 'Unknown error';
       }
       
       setError(errorMessage);
@@ -159,7 +160,7 @@ const NewChatScreen: React.FC = () => {
             status: 'offline', // Default status
           }))
           .filter((userData: User) => {
-            // Chỉ lọc ra người dùng hiện tại nếu user đã đăng nhập
+            // Only filter out current user if user is logged in
             if (!user?.user_id) return true;
             return userData.user_id !== user.user_id;
           });
@@ -169,15 +170,15 @@ const NewChatScreen: React.FC = () => {
         setSearchResults(searchResults);
       } catch (error: any) {
         console.error('Error searching users:', error);
-        let errorMessage = 'Không thể tìm kiếm người dùng. ';
+        let errorMessage = 'Unable to search users. ';
         
         if (error.response) {
           console.log('Error response:', error.response.data); // Debug log
-          errorMessage += error.response.data.message || `Lỗi server: ${error.response.status}`;
+          errorMessage += error.response.data.message || `Server error: ${error.response.status}`;
         } else if (error.request) {
-          errorMessage += 'Không có phản hồi từ server';
+          errorMessage += 'No response from server';
         } else {
-          errorMessage += error.message || 'Lỗi không xác định';
+          errorMessage += error.message || 'Unknown error';
         }
         
         setError(errorMessage);
@@ -259,7 +260,7 @@ const NewChatScreen: React.FC = () => {
               styles.status,
               { color: item.status === 'online' ? '#4CAF50' : '#666' }
             ]}>
-              {item.status === 'online' ? 'Đang hoạt động' : 'Ngoại tuyến'}
+              {item.status === 'online' ? 'Online' : 'Offline'}
             </Text>
           )}
         </View>
@@ -286,8 +287,8 @@ const NewChatScreen: React.FC = () => {
     <View style={styles.emptyState}>
       <Text style={styles.emptyStateText}>
         {isSearching
-          ? 'Không tìm thấy người dùng'
-          : 'Chưa có cuộc trò chuyện nào'}
+          ? 'No users found'
+          : 'No conversations yet'}
       </Text>
     </View>
   );
@@ -307,8 +308,8 @@ const NewChatScreen: React.FC = () => {
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>
                 {isSearching 
-                  ? 'Đang tìm kiếm...' 
-                  : 'Không tìm thấy người dùng nào'}
+                  ? 'Searching...' 
+                  : 'No users found'}
               </Text>
             </View>
           )}
@@ -329,15 +330,11 @@ const NewChatScreen: React.FC = () => {
           ListHeaderComponent={
             <View>
               {sections.map(section => (
-                <View key={section.title}>
-                  {section.data.length > 0 && renderSectionHeader({ title: section.title })}
-                  {section.data.map(item => (
-                    <React.Fragment key={item.user_id}>
-                      {renderUserItem({ item })}
-                      <Divider />
-                    </React.Fragment>
-                  ))}
-                </View>
+                section.data.length > 0 && (
+                  <View key={section.title}>
+                    {renderSectionHeader({ title: section.title })}
+                  </View>
+                )
               ))}
             </View>
           }
@@ -349,43 +346,65 @@ const NewChatScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Searchbar
-          placeholder="Tìm kiếm người dùng..."
-          onChangeText={handleSearch}
-          value={searchQuery}
-          style={styles.searchBar}
-        />
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right', 'bottom']}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Searchbar
+            placeholder="Search users..."
+            onChangeText={handleSearch}
+            value={searchQuery}
+            style={styles.searchBar}
+          />
+        </View>
+
+        <View style={styles.avatarList}>
+          <FlatList
+            horizontal
+            data={sections.length > 0 ? sections[0].data : []}
+            renderItem={({item}) => (
+              <View style={{alignItems: 'center', marginRight: 12}}>
+                {item.avatar_url ? (
+                  <Avatar.Image size={48} source={{ uri: item.avatar_url }} style={styles.avatarCircle} />
+                ) : (
+                  <DefaultAvatar username={item.username} size={48} />
+                )}
+                <Text style={styles.avatarName}>{item.username}</Text>
+              </View>
+            )}
+            keyExtractor={item => item.user_id}
+            showsHorizontalScrollIndicator={false}
+            style={{marginVertical: 8}}
+          />
+        </View>
+
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={loadUsers}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : isLoading && !searchQuery ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        ) : (
+          renderListContent()
+        )}
+
+        {selectedUsers.size > 0 && (
+          <FAB
+            icon={selectedUsers.size === 1 ? 'message' : 'account-group'}
+            label={selectedUsers.size === 1 ? 'Start Chat' : 'Create Group'}
+            onPress={handleStartChat}
+            style={styles.fab}
+          />
+        )}
       </View>
-
-      {error ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={loadUsers}
-          >
-            <Text style={styles.retryButtonText}>Thử lại</Text>
-          </TouchableOpacity>
-        </View>
-      ) : isLoading && !searchQuery ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      ) : (
-        renderListContent()
-      )}
-
-      {selectedUsers.size > 0 && (
-        <FAB
-          icon={selectedUsers.size === 1 ? 'message' : 'account-group'}
-          label={selectedUsers.size === 1 ? 'Bắt đầu chat' : 'Tạo nhóm'}
-          onPress={handleStartChat}
-          style={styles.fab}
-        />
-      )}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -479,6 +498,46 @@ const styles = StyleSheet.create({
   },
   emptyListContainer: {
     padding: 20,
+  },
+  avatarList: {
+    flexDirection: 'row',
+    marginVertical: 8,
+    paddingHorizontal: 12,
+  },
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginHorizontal: 8,
+  },
+  avatarName: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    color: '#444',
+  },
+  chatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    marginVertical: 4,
+    marginHorizontal: 8,
+  },
+  unreadBadge: {
+    backgroundColor: '#e53935',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  unreadText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
 
