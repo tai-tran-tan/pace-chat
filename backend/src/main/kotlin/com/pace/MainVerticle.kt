@@ -1,7 +1,8 @@
 // src/main/kotlin/com/pacechat/MainVerticle.kt
 package com.pace
 
-import com.pace.data.InMemoryDatabase
+import com.pace.data.db.DbAccessible
+import com.pace.data.db.impl.InMemoryDatabase
 import com.pace.router.AuthRouter
 import com.pace.router.ConversationRouter
 import com.pace.router.MessageRouter
@@ -10,7 +11,7 @@ import com.pace.security.JwtConfig
 import com.pace.security.JwtService
 import com.pace.ws.ConnectionsManager
 import com.pace.ws.WebSocketHandler
-import io.klogging.logger
+import io.klogging.java.LoggerFactory
 import io.vertx.core.AbstractVerticle
 import io.vertx.core.http.HttpServerOptions
 import io.vertx.ext.auth.JWTOptions
@@ -24,14 +25,13 @@ import io.vertx.ext.web.handler.JWTAuthHandler
 
 class MainVerticle : AbstractVerticle() {
 
-    private val logger = logger(this::class)
-    private lateinit var jwtService: JwtService
+    private val logger = LoggerFactory.getLogger(this::class.java)
+    private var jwtService: JwtService = JwtService()
+    private val db: DbAccessible = InMemoryDatabase()
+    private val connectionsManager = ConnectionsManager(db)
     private lateinit var jwtAuthProvider: JWTAuth
 
     override fun start() {
-        // Initialize JWT Service
-        jwtService = JwtService()
-
         // Configure JWT Auth Provider for Vert.x Web
         // In a real app, use asymmetric keys or a more robust key store.
         // For simulation, we'll use a symmetric key directly.
@@ -49,9 +49,6 @@ class MainVerticle : AbstractVerticle() {
                     .setAudience(listOf(JwtConfig.audience))
             )
         jwtAuthProvider = JWTAuth.create(vertx, jwtAuthOptions)
-
-        // Initialize our in-memory database with dummy data
-        InMemoryDatabase.init()
 
         // Setup HTTP Router
         val router = Router.router(vertx)
@@ -74,7 +71,7 @@ class MainVerticle : AbstractVerticle() {
         router.route().handler(BodyHandler.create())
 
         // Public routes
-        AuthRouter(router, jwtService).setupRoutes()
+        AuthRouter(router, jwtService, db).setupRoutes()
 
         // Protected routes using JWT authentication
         val protectedRouter = Router.router(vertx)
@@ -90,14 +87,14 @@ class MainVerticle : AbstractVerticle() {
             }
         }
 
-        UserRouter(protectedRouter).setupRoutes()
-        ConversationRouter(protectedRouter).setupRoutes()
-        MessageRouter(protectedRouter).setupRoutes()
+        UserRouter(protectedRouter, db).setupRoutes()
+        ConversationRouter(protectedRouter, db, connectionsManager).setupRoutes()
+        MessageRouter(protectedRouter, db).setupRoutes()
 
         router.route("/v1/*").subRouter(protectedRouter) // Mount protected routes under /v1
 
         // WebSocket Handler
-        val wsHandler = WebSocketHandler(vertx, jwtService, InMemoryDatabase, ConnectionsManager)
+        val wsHandler = WebSocketHandler(vertx, jwtService, db, connectionsManager)
 
         // Create HTTP server that also handles WebSockets
         vertx.createHttpServer(HttpServerOptions().setPort(8080).setHost("0.0.0.0"))
@@ -108,7 +105,7 @@ class MainVerticle : AbstractVerticle() {
             }
             .listen(8080)
             .onSuccess { http ->
-                println("HTTP and WebSocket server started on port 8080")
+                logger.info("HTTP and WebSocket server started on port 8080")
             }
             .onFailure { err ->
                 println("Failed to start HTTP/WebSocket server: ${err.cause?.message}")

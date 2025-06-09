@@ -1,7 +1,7 @@
 // src/main/kotlin/com/pacechat/websocket/WebSocketHandler.kt
 package com.pace.ws
 
-import com.pace.data.InMemoryDatabase
+import com.pace.data.db.DbAccessible
 import com.pace.data.model.WsMessage
 import com.pace.security.JwtService
 import io.klogging.java.LoggerFactory
@@ -17,7 +17,7 @@ import kotlinx.serialization.json.Json
 class WebSocketHandler(
     private val vertx: io.vertx.core.Vertx,
     private val jwtService: JwtService,
-    private val inMemoryDatabase: InMemoryDatabase,
+    private val inMemoryDatabase: DbAccessible,
     private val connectionsManager: ConnectionsManager
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)

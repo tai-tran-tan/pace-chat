@@ -1,11 +1,11 @@
 // src/main/kotlin/com/pacechat/websocket/ConnectionsManager.kt
 package com.pace.ws
 
-import com.pace.data.InMemoryDatabase
+import com.pace.data.db.DbAccessible
 import io.klogging.java.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
-object ConnectionsManager {
+class ConnectionsManager(private val db: DbAccessible) {
     private val logger = LoggerFactory.getLogger(this::class.java)
     // Using userId -> Connection for quick lookup and managing authenticated sessions
     private val connections = ConcurrentHashMap<String, Connection>()
@@ -42,7 +42,7 @@ object ConnectionsManager {
     }
 
     fun broadcastMessageToConversationParticipants(conversationId: String, message: String) {
-        val conversation = InMemoryDatabase.findConversationById(conversationId)
+        val conversation = db.findConversationById(conversationId)
         if (conversation != null) {
             conversation.participants.forEach { participant ->
                 sendMessageToUser(participant.userId, message)
