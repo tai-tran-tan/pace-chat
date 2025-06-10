@@ -5,6 +5,7 @@ import { RouteProp } from '@react-navigation/native';
 export type RootStackParamList = {
   Auth: undefined;
   Home: undefined;
+  Search: undefined;
   Chat: { conversationId?: string; userId?: string; username: string };
   NewChat: undefined;
   Profile: undefined;

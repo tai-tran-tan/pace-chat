@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -18,6 +18,41 @@ import MainNavigator from './components/common/MainNavigator';
 import type { RootStackParamList } from './types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// Component to handle WebSocket errors with navigation
+const WebSocketErrorHandler = () => {
+  const navigation = useNavigation<any>();
+  const { logout } = useAuthStore();
+
+  useEffect(() => {
+    // Register a global error handler for WebSocket authentication/session errors
+    const unsubscribe = socketService.onError((error) => {
+      // If the error message indicates authentication failure or session expiration, logout and navigate to AuthScreen
+      if (
+        error?.message?.includes('Authentication failed') ||
+        error?.message?.includes('User session expired')
+      ) {
+        logout();
+        
+        // Check if we're already on Auth screen to avoid unnecessary navigation
+        const currentRoute = navigation.getCurrentRoute();
+        if (currentRoute?.name !== 'Auth') {
+          // Reset navigation stack to AuthScreen only if not already there
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Auth' }]
+          });
+        }
+      }
+    });
+    return () => {
+      // Cleanup the error handler on unmount
+      unsubscribe && unsubscribe();
+    };
+  }, [navigation, logout]);
+
+  return null;
+};
 
 const App = () => {
   const { isAuthenticated, user, initializeAuth } = useAuthStore();
@@ -107,6 +142,7 @@ const App = () => {
         <PaperProvider>
           <NavigationContainer>
             <StatusBar style="auto" />
+            <WebSocketErrorHandler />
             <Stack.Navigator
               screenOptions={{
                 headerShown: false,
@@ -116,7 +152,7 @@ const App = () => {
               {!isAuthenticated ? (
                 <Stack.Screen name="Auth" component={AuthScreen} />
               ) : (
-                <Stack.Screen name="Main" component={MainNavigator} />
+                <Stack.Screen name="Home" component={MainNavigator} />
               )}
             </Stack.Navigator>
           </NavigationContainer>

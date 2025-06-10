@@ -8,8 +8,6 @@ interface ChatHeaderProps {
   name: string;
   status: string;
   onBack: () => void;
-  onCall: () => void;
-  onVideo: () => void;
   onInfo: () => void;
 }
 
@@ -18,8 +16,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   name,
   status,
   onBack,
-  onCall,
-  onVideo,
   onInfo
 }) => {
   const theme = useTheme();
@@ -38,7 +34,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           <TouchableOpacity style={styles.userInfo} onPress={onInfo}>
             <Avatar.Image
               size={40}
-              source={{ uri: avatar }}
+              source={{ uri: 'https://i.pravatar.cc/50' || avatar }}
               style={styles.avatar}
             />
             <View style={styles.textContainer}>
@@ -47,20 +43,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             </View>
           </TouchableOpacity>
         </View>
-        
         <View style={styles.rightSection}>
-          <IconButton
-            icon="phone"
-            size={24}
-            iconColor="#fff"
-            onPress={onCall}
-          />
-          <IconButton
-            icon="video"
-            size={24}
-            iconColor="#fff"
-            onPress={onVideo}
-          />
           <IconButton
             icon="dots-vertical"
             size={24}
@@ -76,8 +59,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#4facfe',
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
   },
   content: {
     flexDirection: 'row',

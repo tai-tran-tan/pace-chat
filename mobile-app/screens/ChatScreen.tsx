@@ -8,7 +8,7 @@ import MessageBubble from '../components/chat/MessageBubble';
 import socketService from '../services/socket';
 import { useAuthStore } from '../store/useAuthStore';
 import { useWebSocketManager } from '../hooks/useWebSocketManager';
-import { useChatHeader } from '../contexts/ChatHeaderContext';
+import { useChatHeaderStore } from '../store/useChatHeaderStore';
 import api from '../services/api';
 import { Button } from 'react-native-paper';
 
@@ -56,7 +56,7 @@ const ChatScreen = () => {
   const route = useRoute<ChatScreenRouteProp>();
   const { conversationId, userId, username } = route.params as ChatScreenParams;
   const { user } = useAuthStore();
-  const { setChatHeaderProps, clearChatHeaderProps } = useChatHeader();
+  const { setChatHeaderProps, clearChatHeaderProps } = useChatHeaderStore();
 
   // Use WebSocket manager for this chat screen
   const { isConnected: wsConnected, resetIdleTimer } = useWebSocketManager({
@@ -420,7 +420,7 @@ const ChatScreen = () => {
                   hour: '2-digit', 
                   minute: '2-digit' 
                 })}
-                isRead={item.read_by.length > 0}
+                isRead={item?.read_by?.length > 0}
               />
             )}
             contentContainerStyle={[
@@ -448,6 +448,7 @@ const ChatScreen = () => {
           onAttach={() => {}}
           onTyping={handleTyping}
           disabled={isSending || !currentConversationId || !wsConnected}
+          style={{marginBottom: 16, marginHorizontal: 8}}
         />
       </KeyboardAvoidingView>
     </View>

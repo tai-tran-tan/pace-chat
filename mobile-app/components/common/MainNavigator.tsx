@@ -5,16 +5,17 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from './Header';
-import { ChatHeaderProvider } from '../../contexts/ChatHeaderContext';
 import { useNavigation } from '@react-navigation/native';
+import { useSearchStore } from '../../store/useSearchStore';
+import type { RootStackNavigationProp } from '../../types/navigation';
 
 // Import screens
 import HomeScreen from '../../screens/HomeScreen';
+import SearchScreen from '../../screens/SearchScreen';
 import ProfileScreen from '../../screens/ProfileScreen';
 import ContactScreen from '../../screens/ContactScreen';
 import MediaScreen from '../../screens/MediaScreen';
 import ChatScreen from '../../screens/ChatScreen';
-import NewChatScreen from '../../screens/NewChatScreen';
 import ChatInfoScreen from '../../screens/ChatInfoScreen';
 
 const Stack = createNativeStackNavigator();
@@ -22,15 +23,23 @@ const Tab = createBottomTabNavigator();
 
 // Wrapper components for each tab
 const HomeTabWrapper = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<RootStackNavigationProp>();
+  const { searchQuery, setSearchQuery } = useSearchStore();
   
   return (
     <>
       <Header 
         showSearch={true}
-        searchPlaceholder="Search conversations or users..."
+        searchPlaceholder="Search"
+        onSearchChange={setSearchQuery}
+        searchValue={searchQuery}
+        onSearchPress={() => navigation.navigate("Search")}
+        onSearchInputPress={() => navigation.navigate("Search")}
+        showQRScanner={true}
+        showAddButton={true}
         onQRScannerPress={() => console.log("QR Scanner pressed")}
-        onAddPress={() => navigation.navigate("NewChat" as never)}
+        onAddPress={() => navigation.navigate("NewChat")}
+        searchInputAsTextOnly={true}
       />
       <HomeScreen />
     </>
@@ -38,7 +47,7 @@ const HomeTabWrapper = () => {
 };
 
 const ContactTabWrapper = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<RootStackNavigationProp>();
   
   return (
     <>
@@ -46,6 +55,9 @@ const ContactTabWrapper = () => {
         title="Contacts"
         showSearch={true}
         searchPlaceholder="Search contacts..."
+        onSearchPress={() => navigation.navigate("Search")}
+        onSearchInputPress={() => navigation.navigate("Search")}
+        showAddButton={true}
         onAddPress={() => console.log("Add contact pressed")}
       />
       <ContactScreen />
@@ -53,16 +65,22 @@ const ContactTabWrapper = () => {
   );
 };
 
-const MediaTabWrapper = () => (
-  <>
-    <Header 
-      title="Media"
-      showSearch={true}
-      searchPlaceholder="Search media..."
-    />
-    <MediaScreen />
-  </>
-);
+const MediaTabWrapper = () => {
+  const navigation = useNavigation<RootStackNavigationProp>();
+  
+  return (
+    <>
+      <Header 
+        title="Media"
+        showSearch={true}
+        searchPlaceholder="Search media..."
+        onSearchPress={() => navigation.navigate("Search")}
+        onSearchInputPress={() => navigation.navigate("Search")}
+      />
+      <MediaScreen />
+    </>
+  );
+};
 
 const ProfileTabWrapper = () => (
   <>
@@ -98,7 +116,7 @@ const ScreenWithHeader = ({
 };
 
 const ChatScreenWrapper = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<RootStackNavigationProp>();
   
   return (
     <>
@@ -108,7 +126,7 @@ const ChatScreenWrapper = () => {
         showSearch={true}
         searchPlaceholder="Search in chat..."
         showInfoButton={true}
-        onInfoPress={() => navigation.navigate("ChatInfo" as never)}
+        onInfoPress={() => navigation.navigate("ChatInfo")}
         showQRScanner={false}
         showAddButton={false}
       />
@@ -133,21 +151,25 @@ const ChatInfoWrapper = () => {
   );
 };
 
-const NewChatWrapper = () => {
+const SearchWrapper = () => {
+  const navigation = useNavigation<RootStackNavigationProp>();
+  const { searchQuery, setSearchQuery } = useSearchStore();
+  
   return (
     <ScreenWithHeader
       headerProps={{
-        title: "New Chat",
+        title: "Search",
         showBackButton: true,
-        showSearch: false,
+        showSearch: true,
         searchPlaceholder: "Search users...",
-        showQRScanner: true,
-        showAddButton: true,
-        onQRScannerPress: () => console.log("QR Scanner pressed in NewChat"),
-        onAddPress: () => console.log("Add pressed in NewChat"),
+        onSearchChange: setSearchQuery,
+        searchValue: searchQuery,
+        showSearchIcon: false, // Hide search icon in SearchScreen
+        showQRScanner: false,
+        showAddButton: false,
       }}
     >
-      <NewChatScreen />
+      <SearchScreen />
     </ScreenWithHeader>
   );
 };
@@ -209,32 +231,30 @@ const TabNavigator = () => {
 // Main Navigator with Header and Bottom Tabs
 const MainNavigator = () => {
   return (
-    <ChatHeaderProvider>
-      <SafeAreaView
-        style={{ flex: 1, backgroundColor: "#fff" }}
-        edges={["left", "right"]}
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: "#fff" }}
+      edges={["left", "right"]}
+    >
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+        }}
       >
-        <Stack.Navigator
-          screenOptions={{
+        <Stack.Screen name="MainTabs" component={TabNavigator} />
+        <Stack.Screen name="Search" component={SearchWrapper} />
+        <Stack.Screen 
+          name="Chat" 
+          component={ChatScreenWrapper}
+          options={{
             headerShown: false,
-            animation: 'slide_from_right',
           }}
-        >
-          <Stack.Screen name="MainTabs" component={TabNavigator} />
-          <Stack.Screen 
-            name="Chat" 
-            component={ChatScreenWrapper}
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen name="NewChat" component={NewChatWrapper} />
-          <Stack.Screen name="Contact" component={ContactScreen} />
-          <Stack.Screen name="Media" component={MediaScreen} />
-          <Stack.Screen name="ChatInfo" component={ChatInfoWrapper} />
-        </Stack.Navigator>
-      </SafeAreaView>
-    </ChatHeaderProvider>
+        />
+        <Stack.Screen name="Contact" component={ContactScreen} />
+        <Stack.Screen name="Media" component={MediaScreen} />
+        <Stack.Screen name="ChatInfo" component={ChatInfoWrapper} />
+      </Stack.Navigator>
+    </SafeAreaView>
   );
 };
 

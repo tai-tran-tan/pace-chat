@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from "react";
-import { View, StyleSheet, FlatList, RefreshControl, ActivityIndicator } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, StyleSheet, FlatList, RefreshControl, ActivityIndicator, TouchableOpacity } from "react-native";
 import { FAB, Text } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
 import type { RootStackNavigationProp } from "../types/navigation";
@@ -7,23 +7,7 @@ import ChatItem from "../components/chat/ChatItem";
 import { useWebSocketManager } from "../hooks/useWebSocketManager";
 import { useAuthStore } from "../store/useAuthStore";
 import api from "../services/api";
-
-// Context for sharing search state between Header and HomeScreen
-interface SearchContextType {
-  searchQuery: string;
-  onSearchChange: (text: string) => void;
-  isSearching: boolean;
-}
-
-const SearchContext = createContext<SearchContextType | null>(null);
-
-export const useSearchContext = () => {
-  const context = useContext(SearchContext);
-  if (!context) {
-    throw new Error('useSearchContext must be used within SearchProvider');
-  }
-  return context;
-};
+import { useTheme } from '../hooks/useTheme';
 
 type Conversation = {
   conversation_id: string;
@@ -39,25 +23,14 @@ type Conversation = {
   unread_count: number;
 };
 
-type User = {
-  user_id: string;
-  username: string;
-  avatar_url: string | null;
-  status?: "online" | "offline" | "away";
-  last_seen?: string;
-};
-
 const HomeScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
   const { user } = useAuthStore();
+  const theme = useTheme();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearchResults, setShowSearchResults] = useState(false);
 
   // Use WebSocket manager with idle disconnect for home screen
   const { isConnected: wsConnected } = useWebSocketManager({
@@ -94,53 +67,6 @@ const HomeScreen = () => {
     }
   }, [user?.user_id]);
 
-  // Search users
-  const searchUsers = useCallback(async (query: string) => {
-    if (!query.trim() || !user?.user_id) {
-      setSearchResults([]);
-      setShowSearchResults(false);
-      return;
-    }
-
-    try {
-      setIsSearching(true);
-      setError(null);
-
-      const response = await api.get("/users/search", {
-        params: { query: query.trim() }
-      });
-
-      // Filter out current user and map to User type
-      const results = (response.data || [])
-        .filter((userData: any) => userData.user_id !== user.user_id)
-        .map((userData: any) => ({
-          user_id: userData.user_id,
-          username: userData.username,
-          avatar_url: userData.avatar_url,
-          status: "offline" // Default status
-        }));
-
-      setSearchResults(results);
-      setShowSearchResults(true);
-    } catch (error: any) {
-      console.error("Failed to search users:", error);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [user?.user_id]);
-
-  // Handle search input change
-  const handleSearchChange = useCallback((text: string) => {
-    setSearchQuery(text);
-    if (text.trim()) {
-      searchUsers(text);
-    } else {
-      setSearchResults([]);
-      setShowSearchResults(false);
-    }
-  }, [searchUsers]);
-
   // Load conversations on mount
   useEffect(() => {
     fetchConversations();
@@ -164,14 +90,6 @@ const HomeScreen = () => {
     navigation.navigate("Chat", {
       conversationId: conversation.conversation_id,
       username: displayName
-    });
-  };
-
-  // Handle user search result press
-  const handleUserPress = (user: User) => {
-    navigation.navigate("Chat", {
-      userId: user.user_id,
-      username: user.username
     });
   };
 
@@ -224,22 +142,12 @@ const HomeScreen = () => {
   const renderChatItem = ({ item }: { item: Conversation }) => (
     <ChatItem
       name={getConversationDisplayName(item)}
-      lastMessage={item.last_message_preview || "No messages yet"}
+      subtitle={item.last_message_preview || "No messages yet"}
       timestamp={formatTimestamp(item.last_message_timestamp)}
       unreadCount={item.unread_count}
       avatar={getConversationAvatar(item)}
+      isOnline={true}
       onPress={() => handleConversationPress(item)}
-    />
-  );
-
-  const renderUserItem = ({ item }: { item: User }) => (
-    <ChatItem
-      name={item.username}
-      lastMessage="Tap to start chat"
-      timestamp=""
-      unreadCount={0}
-      avatar={item.avatar_url || `https://i.pravatar.cc/150?img=${item.user_id}`}
-      onPress={() => handleUserPress(item)}
     />
   );
 
@@ -247,52 +155,10 @@ const HomeScreen = () => {
     fetchConversations(true);
   };
 
-  const getCurrentData = () => {
-    if (showSearchResults) {
-      return searchResults;
-    }
-    return conversations;
-  };
-
-  const getCurrentRenderItem = () => {
-    if (showSearchResults) {
-      return renderUserItem;
-    }
-    return renderChatItem;
-  };
-
-  const getCurrentKeyExtractor = () => {
-    if (showSearchResults) {
-      return (item: User) => item.user_id;
-    }
-    return (item: Conversation) => item.conversation_id;
-  };
-
-  const getEmptyMessage = () => {
-    if (showSearchResults) {
-      return searchQuery.trim() ? "No users found" : "Search for users to start a chat";
-    }
-    return "No conversations yet";
-  };
-
-  const getEmptySubMessage = () => {
-    if (showSearchResults) {
-      return "Try a different search term";
-    }
-    return "Start a new chat to begin messaging";
-  };
-
-  // Provide search context
-  const searchContextValue: SearchContextType = {
-    searchQuery,
-    onSearchChange: handleSearchChange,
-    isSearching
-  };
-
   if (error && !isLoading) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
+      <View style={[theme.containerStyles.flex, theme.stateStyles.errorContainer]}>
+        <Text style={theme.textStyles.error}>{error}</Text>
         <FAB
           icon="refresh"
           style={styles.retryFab}
@@ -304,52 +170,41 @@ const HomeScreen = () => {
   }
 
   return (
-    <SearchContext.Provider value={searchContextValue}>
-      <View style={styles.container}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#2196F3" />
-            <Text style={styles.loadingText}>Loading conversations...</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={getCurrentData()}
-            renderItem={getCurrentRenderItem()}
-            keyExtractor={getCurrentKeyExtractor()}
-            contentContainerStyle={styles.chatList}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={handleRefresh}
-                colors={["#2196F3"]}
-              />
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>{getEmptyMessage()}</Text>
-                <Text style={styles.emptySubtext}>{getEmptySubMessage()}</Text>
-              </View>
-            }
-          />
-        )}
-        <FAB
-          icon="plus"
-          style={styles.fab}
-          onPress={handleNewChat}
-          label="New Chat"
+    <View style={[theme.containerStyles.flex, { backgroundColor: theme.colors.background.primary }]}>
+      {isLoading ? (
+        <View style={theme.stateStyles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary.main} />
+          <Text style={[theme.textStyles.body, { marginTop: theme.spacing.md }]}>Loading conversations...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={conversations}
+          renderItem={renderChatItem}
+          keyExtractor={(item: Conversation) => item.conversation_id}
+          contentContainerStyle={styles.chatList}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              colors={[theme.colors.primary.main]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={theme.stateStyles.emptyContainer}>
+              <Text style={theme.textStyles.h3}>No conversations yet</Text>
+              <Text style={theme.textStyles.bodySmall}>Start a new chat to begin messaging</Text>
+            </View>
+          }
         />
-      </View>
-    </SearchContext.Provider>
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff"
-  },
   chatList: {
-    padding: 8
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
   fab: {
     position: "absolute",
@@ -357,47 +212,14 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center"
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#666"
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24
-  },
-  errorText: {
-    fontSize: 16,
-    color: "#d32f2f",
-    textAlign: "center",
-    marginBottom: 16
-  },
   retryFab: {
     marginTop: 16
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 48
+  searchInputContainer: {
+    padding: 8
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#666",
-    marginBottom: 8
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: "#999",
-    textAlign: "center"
+  input: {
+    fontSize: 16
   }
 });
 

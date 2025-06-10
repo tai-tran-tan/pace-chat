@@ -126,10 +126,10 @@ const MediaScreen = () => {
     { key: "all", label: "Tất cả", icon: "view-grid" },
     { key: "image", label: "Hình ảnh", icon: "image" },
     { key: "video", label: "Video", icon: "video" },
-    // { key: "note", label: "Ghi chú", icon: "note-text" },
-    // { key: "poll", label: "Bình chọn", icon: "poll" },
-    // { key: "file", label: "Tệp tin", icon: "file" },
-    // { key: "audio", label: "Âm thanh", icon: "music" }
+    { key: "note", label: "Ghi chú", icon: "note-text" },
+    { key: "poll", label: "Bình chọn", icon: "poll" },
+    { key: "file", label: "Tệp tin", icon: "file" },
+    { key: "audio", label: "Âm thanh", icon: "music" }
   ];
 
   const filteredMedia = selectedFilter === "all" 

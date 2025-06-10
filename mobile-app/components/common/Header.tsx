@@ -5,21 +5,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ChatHeader from './ChatHeader';
-import { useChatHeader } from '../../contexts/ChatHeaderContext';
+import { useChatHeaderStore } from '../../store/useChatHeaderStore';
 import type { RootStackNavigationProp } from '../../types/navigation';
 
-const HEADER_HEIGHT = 56;
+const HEADER_HEIGHT = 44;
 
 interface HeaderProps {
   showSearch?: boolean;
   searchPlaceholder?: string;
   onSearchChange?: (text: string) => void;
   searchValue?: string;
+  onSearchPress?: () => void;
+  onSearchInputPress?: () => void;
+  showSearchIcon?: boolean;
   showQRScanner?: boolean;
   showAddButton?: boolean;
   onQRScannerPress?: () => void;
   onAddPress?: () => void;
-  title?: string;
   showBackButton?: boolean;
   onBackPress?: () => void;
   rightActions?: React.ReactNode;
@@ -29,6 +31,7 @@ interface HeaderProps {
   onInfoPress?: () => void;
   avatarSource?: string;
   avatarName?: string;
+  searchInputAsTextOnly?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -36,11 +39,13 @@ const Header: React.FC<HeaderProps> = ({
   searchPlaceholder = "Search",
   onSearchChange,
   searchValue = "",
+  onSearchPress,
+  onSearchInputPress,
+  showSearchIcon = true,
   showQRScanner = true,
   showAddButton = true,
   onQRScannerPress,
   onAddPress,
-  title,
   showBackButton = false,
   onBackPress,
   rightActions,
@@ -49,12 +54,13 @@ const Header: React.FC<HeaderProps> = ({
   showInfoButton = false,
   onInfoPress,
   avatarSource,
-  avatarName
+  avatarName,
+  searchInputAsTextOnly = false
 }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<RootStackNavigationProp>();
   const route = useRoute();
-  const { chatHeaderProps } = useChatHeader();
+  const chatHeaderProps = useChatHeaderStore(state => state.chatHeaderProps);
 
   // Check if current screen is ChatScreen
   const isChatScreen = route.name === 'Chat';
@@ -91,14 +97,8 @@ const Header: React.FC<HeaderProps> = ({
             style={styles.backButton} 
             onPress={onBackPress || (() => navigation.goBack())}
           >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Ionicons name="arrow-back" size={20} color="#fff" />
           </TouchableOpacity>
-        )}
-        
-        {title && (
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>{title}</Text>
-          </View>
         )}
 
         {showSearch && (
@@ -116,14 +116,31 @@ const Header: React.FC<HeaderProps> = ({
                 )}
               </View>
             )}
-            <Ionicons name="search" size={22} color="#fff" />
-            <TextInput
-              style={styles.input}
-              placeholder={searchPlaceholder}
-              placeholderTextColor="rgba(255, 255, 255, 0.7)"
-              value={searchValue}
-              onChangeText={onSearchChange}
-            />
+            {showSearchIcon && (
+              <TouchableOpacity onPress={onSearchPress}>
+                <Ionicons name="search" size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
+            {searchInputAsTextOnly ? (
+              <TouchableOpacity
+                style={styles.searchInputContainer}
+                onPress={onSearchInputPress}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.input, { color: '#fff', paddingTop: 10 }]}>
+                  {searchValue ? searchValue : searchPlaceholder}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TextInput
+                style={styles.input}
+                placeholder={searchPlaceholder}
+                placeholderTextColor="rgba(255, 255, 255, 0.7)"
+                value={searchValue}
+                onChangeText={onSearchChange}
+                editable={!onSearchInputPress}
+              />
+            )}
           </View>
         )}
 
@@ -132,13 +149,13 @@ const Header: React.FC<HeaderProps> = ({
           
           {showInfoButton && (
             <TouchableOpacity onPress={onInfoPress}>
-              <Ionicons name="information-circle-outline" size={24} color="#fff" />
+              <Ionicons name="information-circle-outline" size={20} color="#fff" />
             </TouchableOpacity>
           )}
           
           {showQRScanner && (
             <TouchableOpacity onPress={onQRScannerPress}>
-              <MaterialIcons name="qr-code-scanner" size={24} color="#fff" />
+              <MaterialIcons name="qr-code-scanner" size={20} color="#fff" />
             </TouchableOpacity>
           )}
           
@@ -147,7 +164,7 @@ const Header: React.FC<HeaderProps> = ({
               style={{ marginLeft: 18 }} 
               onPress={onAddPress}
             >
-              <Ionicons name="add" size={28} color="#fff" />
+              <Ionicons name="add" size={20} color="#fff" />
             </TouchableOpacity>
           )}
         </View>
@@ -162,22 +179,26 @@ const styles = StyleSheet.create({
   content: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingLeft: 16,
+    paddingRight: 16,
+    paddingBottom: 4,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
     backgroundColor: 'transparent',
+    minHeight: 44,
   },
   backButton: {
-    marginRight: 12,
+    marginRight: 6,
   },
   titleContainer: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 8,
   },
   title: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
   },
   leftSection: {
@@ -187,36 +208,41 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   avatarContainer: {
-    marginRight: 8,
+    marginRight: 4,
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
   },
   avatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
+  searchInputContainer: {
+    flex: 1,
+    marginLeft: 4,
+    // justifyContent: 'center',
+    // alignItems: 'center',
+  },
   input: {
-    marginLeft: 8,
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     flex: 1,
     paddingVertical: 0,
   },
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 12,
+    marginLeft: 6,
   },
 });
 
