@@ -1,15 +1,18 @@
 // screens/ChatScreen.tsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, FlatList, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { View, FlatList, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackNavigationProp, ChatScreenRouteProp } from '../types/navigation';
 import MessageInput from '../components/chat/MessageInput';
 import MessageBubble from '../components/chat/MessageBubble';
+import ImageViewer from '../components/chat/ImageViewer';
+import ImageActionSheet from '../components/chat/ImageActionSheet';
 import socketService from '../services/socket';
 import { useAuthStore } from '../store/useAuthStore';
 import { useWebSocketManager } from '../hooks/useWebSocketManager';
 import { useChatHeaderStore } from '../store/useChatHeaderStore';
 import api from '../services/api';
+import FileUploadService from '../services/fileUpload';
 import { Button } from 'react-native-paper';
 
 type User = {
@@ -75,6 +78,10 @@ const ChatScreen = () => {
   const [hasMore, setHasMore] = useState(true);
   const [lastMessageId, setLastMessageId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string>('');
+  const [imageActionSheetVisible, setImageActionSheetVisible] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
 
@@ -352,6 +359,113 @@ const ChatScreen = () => {
     }
   };
 
+  const handleSendImage = async () => {
+    if (isUploading || !currentConversationId) return;
+    console.log('Image icon clicked, opening action sheet');
+    setImageActionSheetVisible(true);
+  };
+
+  const handleImageFromCamera = async () => {
+    if (isUploading || !currentConversationId) return;
+
+    try {
+      setIsUploading(true);
+      
+      // Take photo using camera
+      const imageUri = await FileUploadService.takePhoto();
+      if (!imageUri) {
+        return; // User cancelled
+      }
+
+      await uploadAndSendImage(imageUri);
+    } catch (error: any) {
+      console.error('Failed to take photo:', error);
+      Alert.alert('Error', error.message || 'Failed to take photo. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleImageFromGallery = async () => {
+    if (isUploading || !currentConversationId) return;
+    console.log('Gallery option selected');
+    setImageActionSheetVisible(false);
+    setTimeout(async () => {
+      try {
+        setIsUploading(true);
+        const imageUri = await FileUploadService.pickImage();
+        if (!imageUri) return;
+        await uploadAndSendImage(imageUri);
+      } catch (error: any) {
+        console.error('Failed to pick image:', error);
+        Alert.alert('Error', error.message || 'Failed to pick image. Please try again.');
+      } finally {
+        setIsUploading(false);
+      }
+    }, 300);
+  };
+
+  const uploadAndSendImage = async (imageUri: string) => {
+    // Reset idle timer on user activity
+    resetIdleTimer();
+
+    const tempMessageId = `temp_img_${Date.now()}`;
+    
+    // Show loading message
+    const tempMessage: Message = {
+      message_id: tempMessageId,
+      conversation_id: currentConversationId!,
+      sender_id: user?.user_id || '',
+      content: 'Uploading image...',
+      message_type: 'image',
+      timestamp: new Date().toISOString(),
+      read_by: [],
+      sender_name: user?.username,
+      sender_avatar: user?.avatar_url || `https://i.pravatar.cc/150?img=${user?.user_id}`,
+    };
+    
+    setMessages(prev => [...prev, tempMessage]);
+    
+    // Scroll to bottom
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 50);
+
+    // Upload image to server
+    const uploadResponse = await FileUploadService.uploadFile(imageUri);
+    
+    // Update temp message with actual image URL
+    setMessages(prev => prev.map(msg => 
+      msg.message_id === tempMessageId
+        ? { ...msg, content: uploadResponse.file_url }
+        : msg
+    ));
+
+    // Send image message through WebSocket
+    const serverMessageId = await socketService.sendMessage(
+      currentConversationId!, 
+      uploadResponse.file_url,
+      'image'
+    );
+    
+    // Update message with server ID
+    setMessages(prev => prev.map(msg => 
+      msg.message_id === tempMessageId
+        ? { ...msg, message_id: serverMessageId }
+        : msg
+    ));
+  };
+
+  const handleImagePress = (imageUrl: string) => {
+    setSelectedImageUrl(imageUrl);
+    setImageViewerVisible(true);
+  };
+
+  const handleCloseImageViewer = () => {
+    setImageViewerVisible(false);
+    setSelectedImageUrl('');
+  };
+
   const handleTyping = (isTyping: boolean) => {
     if (!currentConversationId) return;
     
@@ -421,6 +535,9 @@ const ChatScreen = () => {
                   minute: '2-digit' 
                 })}
                 isRead={item?.read_by?.length > 0}
+                messageType={item.message_type}
+                onImagePress={() => item.message_type === 'image' ? handleImagePress(item.content) : undefined}
+                isUploading={item.message_id.startsWith('temp_img_')}
               />
             )}
             contentContainerStyle={[
@@ -447,10 +564,24 @@ const ChatScreen = () => {
           onSend={handleSend}
           onAttach={() => {}}
           onTyping={handleTyping}
-          disabled={isSending || !currentConversationId || !wsConnected}
+          onImage={handleSendImage}
+          disabled={isSending || isUploading || !currentConversationId || !wsConnected}
           style={{marginBottom: 16, marginHorizontal: 8}}
         />
       </KeyboardAvoidingView>
+
+      <ImageViewer
+        visible={imageViewerVisible}
+        imageUrl={selectedImageUrl}
+        onClose={handleCloseImageViewer}
+      />
+
+      <ImageActionSheet
+        visible={imageActionSheetVisible}
+        onClose={() => setImageActionSheetVisible(false)}
+        onCamera={handleImageFromCamera}
+        onGallery={handleImageFromGallery}
+      />
     </View>
   );
 };

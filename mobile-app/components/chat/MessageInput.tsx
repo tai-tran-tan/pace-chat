@@ -55,6 +55,12 @@ const MessageInput: React.FC<Props> = ({
     }
   }, [text, onSend, disabled, onTyping]);
 
+  const handleImagePress = useCallback(() => {
+    if (!disabled) {
+      onImage();
+    }
+  }, [onImage, disabled]);
+
   // Cleanup typing timeout on unmount
   React.useEffect(() => {
     return () => {
@@ -81,7 +87,13 @@ const MessageInput: React.FC<Props> = ({
       />
       <IconButton icon="paperclip" size={22} onPress={onAttach} style={styles.icon} />
       <IconButton icon="microphone" size={22} onPress={onRecord} style={styles.icon} />
-      <IconButton icon="image-outline" size={22} onPress={onImage} style={styles.icon} />
+      <IconButton 
+        icon="image-outline" 
+        size={22} 
+        onPress={handleImagePress} 
+        style={styles.icon}
+        disabled={disabled}
+      />
       <IconButton
         icon="send"
         size={22}

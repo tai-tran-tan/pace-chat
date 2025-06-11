@@ -344,17 +344,46 @@ class WebSocketService {
   }
 
   // Send chat message
-  public sendMessage(conversationId: string, content: string, messageType: 'text' | 'image' | 'video' | 'file' = 'text') {
-    const clientMessageId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const message: WsSendMessage = {
-      type: 'SEND_MESSAGE',
-      conversation_id: conversationId,
-      content,
-      message_type: messageType,
-      client_message_id: clientMessageId,
-    };
-    this.send(message);
-    return clientMessageId;
+  public async sendMessage(conversationId: string, content: string, messageType: 'text' | 'image' | 'video' | 'file' = 'text'): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const clientMessageId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const message: WsSendMessage = {
+        type: 'SEND_MESSAGE',
+        conversation_id: conversationId,
+        content,
+        message_type: messageType,
+        client_message_id: clientMessageId,
+      };
+
+      // Set up a one-time handler for MESSAGE_DELIVERED
+      const handleMessageDelivered = (wsMessage: WsMessage) => {
+        if (wsMessage.type === 'MESSAGE_DELIVERED' && wsMessage.client_message_id === clientMessageId) {
+          this.messageHandlers.delete(handleMessageDelivered);
+          if (wsMessage.status === 'success') {
+            resolve(wsMessage.server_message_id);
+          } else {
+            reject(new Error('Message delivery failed'));
+          }
+        }
+      };
+
+      // Add the handler
+      this.messageHandlers.add(handleMessageDelivered);
+
+      // Set timeout for message delivery
+      const timeout = setTimeout(() => {
+        this.messageHandlers.delete(handleMessageDelivered);
+        reject(new Error('Message delivery timeout'));
+      }, 10000); // 10 seconds timeout
+
+      try {
+        this.send(message);
+      } catch (error) {
+        this.messageHandlers.delete(handleMessageDelivered);
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
   }
 
   // Send typing indicator
