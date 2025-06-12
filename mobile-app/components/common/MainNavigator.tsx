@@ -115,24 +115,9 @@ const ScreenWithHeader = ({
   );
 };
 
+// ChatScreenWrapper - ChatScreen manages its own header through ChatHeaderStore
 const ChatScreenWrapper = () => {
-  const navigation = useNavigation<RootStackNavigationProp>();
-  
-  return (
-    <>
-      <Header 
-        showAvatar={true}
-        avatarName="John Doe"
-        showSearch={true}
-        searchPlaceholder="Search in chat..."
-        showInfoButton={true}
-        onInfoPress={() => navigation.navigate("ChatInfo")}
-        showQRScanner={false}
-        showAddButton={false}
-      />
-      <ChatScreen />
-    </>
-  );
+  return <ChatScreen />;
 };
 
 const ChatInfoWrapper = () => {

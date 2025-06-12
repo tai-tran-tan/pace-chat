@@ -27,7 +27,10 @@
     "react-native-screens": "^4.11.1",
     "react-native-tab-view": "^4.1.1",
     "socket.io-client": "^4.7.4",
-    "zustand": "^4.5.1"
+    "zustand": "^4.5.1",
+    "react-i18next": "^15.0.0",
+    "i18next": "^23.10.0",
+    "expo-localization": "~16.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

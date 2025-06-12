@@ -1,0 +1,74 @@
+# React Native Mobile App Rules
+
+## 🎯 Project Type
+React Native mobile application with Expo
+
+## 📱 Platform Rules
+- Target: iOS and Android
+- Minimum iOS version: 13.0
+- Minimum Android API: 21
+- Use Expo managed workflow
+
+## 🎨 UI Framework Rules
+- React Native Paper for UI components
+- React Navigation for navigation
+- Vector Icons for icons
+- React Native Reanimated for animations
+
+## 📝 Code Style
+- Functional components with hooks
+- TypeScript strict mode
+- ESLint + Prettier
+- Import order: React, third-party, local
+- Component props interface naming: ComponentNameProps
+- ALWAYS use English for code, comments, and variable names
+
+## 🗃️ State Management
+- Zustand for global state management
+- Store naming: use[Feature]Store.ts
+- Separate stores for different features
+- Async actions with proper error handling
+
+## 🌐 Network & Communication
+- Axios for HTTP API calls
+- Socket.io-client for WebSocket communication
+- Centralized API service layer
+- Error handling for network requests
+
+## 🌍 Internationalization (i18n)
+- react-i18next for internationalization
+- i18next for translation management
+- expo-localization for device language detection
+- Language files in i18n/locales/
+- Use t() function for all user-facing text
+- Support English and Vietnamese
+- Language context for dynamic language switching
+
+## 🔧 Development Rules
+- Expo CLI for development
+- Metro bundler
+- Hot reload enabled
+- Debug with React Native Debugger
+
+## 📦 Dependencies Rules
+- Expo SDK version pinning
+- Minimal native dependencies
+- Use Expo modules when possible
+- Regular dependency updates
+
+## 🧪 Testing Rules
+- Jest for unit tests
+- React Native Testing Library
+- Detox for E2E tests
+- Mock native modules
+
+## 📱 Platform Specific Rules
+- Platform-specific code with Platform.select()
+- Safe area handling
+- Keyboard avoiding behavior
+- Biometric authentication support
+
+## 🌐 Language Rules
+- **Code**: Always use English for code, comments, variable names
+- **UI Text**: Use i18n translation keys (t('key')) for all user-facing text
+- **Documentation**: English for all technical documentation 

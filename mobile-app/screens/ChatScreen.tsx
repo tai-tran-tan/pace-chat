@@ -7,6 +7,7 @@ import MessageInput from '../components/chat/MessageInput';
 import MessageBubble from '../components/chat/MessageBubble';
 import ImageViewer from '../components/chat/ImageViewer';
 import ImageActionSheet from '../components/chat/ImageActionSheet';
+import ChatHeader from '../components/common/ChatHeader';
 import socketService from '../services/socket';
 import { useAuthStore } from '../store/useAuthStore';
 import { useWebSocketManager } from '../hooks/useWebSocketManager';
@@ -85,42 +86,38 @@ const ChatScreen = () => {
 
   const flatListRef = useRef<FlatList>(null);
 
-  // Set up ChatHeader when component mounts
-  useEffect(() => {
-    setChatHeaderProps({
-      chatAvatar: conversation?.type === 'private' 
-        ? conversation.participants.find(p => p.user_id !== user?.user_id)?.avatar_url || `https://i.pravatar.cc/150?img=${currentConversationId}`
-        : "https://i.pravatar.cc/150?img=group",
-      chatName: username,
-      chatStatus: isTyping ? 'typing...' : wsConnected ? 'online' : 'connecting...',
-      onChatBack: handleBack,
-      onChatCall: () => {},
-      onChatVideo: () => {},
-      onChatInfo: () => {
+  // Get chat header props
+  const getChatHeaderProps = () => {
+    const chatAvatar = conversation?.type === 'private' 
+      ? conversation.participants.find(p => p.user_id !== user?.user_id)?.avatar_url || `https://i.pravatar.cc/150?img=${currentConversationId}`
+      : "https://i.pravatar.cc/150?img=group";
+    
+    const chatStatus = isTyping ? 'typing...' : wsConnected ? 'online' : 'connecting...';
+    
+    return {
+      avatar: chatAvatar,
+      name: username,
+      status: chatStatus,
+      onBack: handleBack,
+      onCall: () => {
+        // Handle call functionality
+        console.log('Call pressed');
+      },
+      onVideo: () => {
+        // Handle video call functionality
+        console.log('Video call pressed');
+      },
+      onInfo: () => {
         if (conversation) {
           navigation.navigate('ChatInfo', {
             chatId: conversation.conversation_id,
             name: username,
-            avatar: conversation?.type === 'private' 
-              ? conversation.participants.find(p => p.user_id !== user?.user_id)?.avatar_url || `https://i.pravatar.cc/150?img=${currentConversationId}`
-              : "https://i.pravatar.cc/150?img=group",
+            avatar: chatAvatar,
           });
         }
       }
-    });
-
-    // Clean up when component unmounts
-    return () => {
-      clearChatHeaderProps();
     };
-  }, [currentConversationId, username, isTyping, wsConnected, conversation, user?.user_id]);
-
-  // Update chat status when typing or connection status changes
-  useEffect(() => {
-    setChatHeaderProps({
-      chatStatus: isTyping ? 'typing...' : wsConnected ? 'online' : 'connecting...'
-    });
-  }, [isTyping, wsConnected]);
+  };
 
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
@@ -277,71 +274,132 @@ const ChatScreen = () => {
         case 'MESSAGE_DELIVERED':
           // Update message status if needed
           break;
-
-        case 'MESSAGE_READ_STATUS':
-          // Update read status for messages
-          setMessages(prev => prev.map(msg => 
-            msg.message_id === message.message_id
-              ? { ...msg, read_by: [...msg.read_by, message.reader_id] }
-              : msg
-          ));
-          break;
-      }
-    });
-
-    // Handle WebSocket errors and reconnection
-    const unsubscribeError = socketService.onError((error) => {
-      console.error('WebSocket error:', error);
-      setError('Connection error. Reconnecting...');
-    });
-
-    const unsubscribeConnect = socketService.onConnect(() => {
-      setError(null);
-      // Reload messages if needed
-      if (messages.length === 0) {
-        loadMessages();
       }
     });
 
     return () => {
       unsubscribe();
-      unsubscribeError();
-      unsubscribeConnect();
     };
   }, [currentConversationId, user?.user_id, resetIdleTimer]);
 
+  // Send message
   const handleSend = async (text: string) => {
-    if (!text.trim() || isSending || !currentConversationId) return;
+    if (!text.trim() || !currentConversationId || !wsConnected) return;
 
-    // Reset idle timer on user activity
-    resetIdleTimer();
-
-    const tempMessageId = `temp_${Date.now()}`;
     try {
       setIsSending(true);
-      
-      // Optimistically add message to UI
+
+      // Create temporary message for immediate UI feedback
+      const tempMessageId = `temp_${Date.now()}`;
       const tempMessage: Message = {
         message_id: tempMessageId,
         conversation_id: currentConversationId,
-        sender_id: user?.user_id || '',
+        sender_id: user!.user_id,
         content: text,
         message_type: 'text',
         timestamp: new Date().toISOString(),
         read_by: [],
-        sender_name: user?.username,
-        sender_avatar: user?.avatar_url || `https://i.pravatar.cc/150?img=${user?.user_id}`,
+        sender_name: user!.username,
+        sender_avatar: user!.avatar_url || undefined
       };
-      
+
+      // Add temporary message to UI
       setMessages(prev => [...prev, tempMessage]);
-      
-      // Scroll to bottom immediately after adding message
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 50);
 
       // Send message through WebSocket
-      const serverMessageId = await socketService.sendMessage(currentConversationId, text);
+      const serverMessageId = await socketService.sendMessage(
+        currentConversationId, 
+        text, 
+        'text'
+      );
+
+      // Replace temporary message with server message
+      setMessages(prev => prev.map(msg => 
+        msg.message_id === tempMessageId
+          ? { ...msg, message_id: serverMessageId }
+          : msg
+      ));
+
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      // Remove temporary message on error
+      setMessages(prev => prev.filter(msg => !msg.message_id.startsWith('temp_')));
+      Alert.alert('Error', 'Failed to send message. Please try again.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Handle image sending
+  const handleSendImage = async () => {
+    setImageActionSheetVisible(true);
+  };
+
+  const handleImageFromCamera = async () => {
+    setImageActionSheetVisible(false);
+    try {
+      const imageUri = await FileUploadService.takePhoto();
+      if (imageUri) {
+        await uploadAndSendImage(imageUri);
+      }
+    } catch (error) {
+      console.error('Failed to take photo:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    }
+  };
+
+  const handleImageFromGallery = async () => {
+    setImageActionSheetVisible(false);
+    try {
+      const imageUri = await FileUploadService.pickImage();
+      if (imageUri) {
+        await uploadAndSendImage(imageUri);
+      }
+    } catch (error) {
+      console.error('Failed to pick image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const uploadAndSendImage = async (imageUri: string) => {
+    if (!currentConversationId || !wsConnected) return;
+
+    try {
+      setIsUploading(true);
+
+      // Create temporary message for immediate UI feedback
+      const tempMessageId = `temp_img_${Date.now()}`;
+      const tempMessage: Message = {
+        message_id: tempMessageId,
+        conversation_id: currentConversationId,
+        sender_id: user!.user_id,
+        content: imageUri, // Use local URI temporarily
+        message_type: 'image',
+        timestamp: new Date().toISOString(),
+        read_by: [],
+        sender_name: user!.username,
+        sender_avatar: user!.avatar_url || undefined
+      };
+
+      // Add temporary message to UI
+      setMessages(prev => [...prev, tempMessage]);
+
+      // Upload image to server
+      const uploadResponse = await FileUploadService.uploadFile(imageUri);
+      
+      // Update temp message with actual image URL
+      setMessages(prev => prev.map(msg => 
+        msg.message_id === tempMessageId
+          ? { ...msg, content: uploadResponse.file_url }
+          : msg
+      ));
+
+      // Send image message through WebSocket
+      const serverMessageId = await socketService.sendMessage(
+        currentConversationId!, 
+        uploadResponse.file_url,
+        'image'
+      );
       
       // Update message with server ID
       setMessages(prev => prev.map(msg => 
@@ -350,110 +408,13 @@ const ChatScreen = () => {
           : msg
       ));
     } catch (error) {
-      console.error('Failed to send message:', error);
-      setError('Failed to send message. Please try again.');
-      // Remove failed message
-      setMessages(prev => prev.filter(msg => msg.message_id !== tempMessageId));
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleSendImage = async () => {
-    if (isUploading || !currentConversationId) return;
-    console.log('Image icon clicked, opening action sheet');
-    setImageActionSheetVisible(true);
-  };
-
-  const handleImageFromCamera = async () => {
-    if (isUploading || !currentConversationId) return;
-
-    try {
-      setIsUploading(true);
-      
-      // Take photo using camera
-      const imageUri = await FileUploadService.takePhoto();
-      if (!imageUri) {
-        return; // User cancelled
-      }
-
-      await uploadAndSendImage(imageUri);
-    } catch (error: any) {
-      console.error('Failed to take photo:', error);
-      Alert.alert('Error', error.message || 'Failed to take photo. Please try again.');
+      console.error('Failed to upload image:', error);
+      // Remove temporary message on error
+      setMessages(prev => prev.filter(msg => !msg.message_id.startsWith('temp_img_')));
+      Alert.alert('Error', 'Failed to upload image. Please try again.');
     } finally {
       setIsUploading(false);
     }
-  };
-
-  const handleImageFromGallery = async () => {
-    if (isUploading || !currentConversationId) return;
-    console.log('Gallery option selected');
-    setImageActionSheetVisible(false);
-    setTimeout(async () => {
-      try {
-        setIsUploading(true);
-        const imageUri = await FileUploadService.pickImage();
-        if (!imageUri) return;
-        await uploadAndSendImage(imageUri);
-      } catch (error: any) {
-        console.error('Failed to pick image:', error);
-        Alert.alert('Error', error.message || 'Failed to pick image. Please try again.');
-      } finally {
-        setIsUploading(false);
-      }
-    }, 300);
-  };
-
-  const uploadAndSendImage = async (imageUri: string) => {
-    // Reset idle timer on user activity
-    resetIdleTimer();
-
-    const tempMessageId = `temp_img_${Date.now()}`;
-    
-    // Show loading message
-    const tempMessage: Message = {
-      message_id: tempMessageId,
-      conversation_id: currentConversationId!,
-      sender_id: user?.user_id || '',
-      content: 'Uploading image...',
-      message_type: 'image',
-      timestamp: new Date().toISOString(),
-      read_by: [],
-      sender_name: user?.username,
-      sender_avatar: user?.avatar_url || `https://i.pravatar.cc/150?img=${user?.user_id}`,
-    };
-    
-    setMessages(prev => [...prev, tempMessage]);
-    
-    // Scroll to bottom
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 50);
-
-    // Upload image to server
-    const uploadResponse = await FileUploadService.uploadFile(imageUri);
-    
-    // Update temp message with actual image URL
-    setMessages(prev => prev.map(msg => 
-      msg.message_id === tempMessageId
-        ? { ...msg, content: uploadResponse.file_url }
-        : msg
-    ));
-
-    // Send image message through WebSocket
-    const serverMessageId = await socketService.sendMessage(
-      currentConversationId!, 
-      uploadResponse.file_url,
-      'image'
-    );
-    
-    // Update message with server ID
-    setMessages(prev => prev.map(msg => 
-      msg.message_id === tempMessageId
-        ? { ...msg, message_id: serverMessageId }
-        : msg
-    ));
   };
 
   const handleImagePress = (imageUrl: string) => {
@@ -510,8 +471,12 @@ const ChatScreen = () => {
     );
   }
 
+  const chatHeaderProps = getChatHeaderProps();
+
   return (
     <View style={styles.container}>
+      <ChatHeader {...chatHeaderProps} />
+      
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

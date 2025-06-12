@@ -10,6 +10,10 @@ import { useWebSocketManager } from './hooks/useWebSocketManager';
 import socketService from './services/socket';
 import api from './services/api';
 
+// Import i18n configuration
+import './i18n';
+import { LanguageProvider } from './contexts/LanguageContext';
+
 // Screens
 import AuthScreen from './screens/AuthScreen';
 import MainNavigator from './components/common/MainNavigator';
@@ -139,24 +143,26 @@ const App = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <PaperProvider>
-          <NavigationContainer>
-            <StatusBar style="auto" />
-            <WebSocketErrorHandler />
-            <Stack.Navigator
-              screenOptions={{
-                headerShown: false,
-                animation: 'slide_from_right',
-              }}
-            >
-              {!isAuthenticated ? (
-                <Stack.Screen name="Auth" component={AuthScreen} />
-              ) : (
-                <Stack.Screen name="Home" component={MainNavigator} />
-              )}
-            </Stack.Navigator>
-          </NavigationContainer>
-        </PaperProvider>
+        <LanguageProvider>
+          <PaperProvider>
+            <NavigationContainer>
+              <StatusBar style="auto" />
+              <WebSocketErrorHandler />
+              <Stack.Navigator
+                screenOptions={{
+                  headerShown: false,
+                  animation: 'slide_from_right',
+                }}
+              >
+                {!isAuthenticated ? (
+                  <Stack.Screen name="Auth" component={AuthScreen} />
+                ) : (
+                  <Stack.Screen name="Home" component={MainNavigator} />
+                )}
+              </Stack.Navigator>
+            </NavigationContainer>
+          </PaperProvider>
+        </LanguageProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

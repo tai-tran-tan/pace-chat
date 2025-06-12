@@ -1,13 +1,16 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Avatar, IconButton, useTheme } from 'react-native-paper';
+import { Text, Avatar, IconButton } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface ChatHeaderProps {
   avatar: string;
   name: string;
   status: string;
   onBack: () => void;
+  onCall?: () => void;
+  onVideo?: () => void;
   onInfo: () => void;
 }
 
@@ -16,25 +19,35 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   name,
   status,
   onBack,
+  onCall,
+  onVideo,
   onInfo
 }) => {
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <LinearGradient
+      colors={['#4facfe', '#00f2fe']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={[
+        styles.container,
+        { paddingTop: insets.top, minHeight: insets.top + 44 }
+      ]}
+    >
       <View style={styles.content}>
         <View style={styles.leftSection}>
           <IconButton
             icon="arrow-left"
-            size={24}
+            size={20}
             iconColor="#fff"
             onPress={onBack}
+            style={styles.backButton}
           />
           <TouchableOpacity style={styles.userInfo} onPress={onInfo}>
             <Avatar.Image
-              size={40}
-              source={{ uri: 'https://i.pravatar.cc/50' || avatar }}
+              size={24}
+              source={{ uri: avatar }}
               style={styles.avatar}
             />
             <View style={styles.textContainer}>
@@ -44,33 +57,55 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </TouchableOpacity>
         </View>
         <View style={styles.rightSection}>
+          {onCall && (
+            <IconButton
+              icon="phone"
+              size={20}
+              iconColor="#fff"
+              onPress={onCall}
+            />
+          )}
+          {onVideo && (
+            <IconButton
+              icon="video"
+              size={20}
+              iconColor="#fff"
+              onPress={onVideo}
+            />
+          )}
           <IconButton
             icon="dots-vertical"
-            size={24}
+            size={20}
             iconColor="#fff"
             onPress={onInfo}
           />
         </View>
       </View>
-    </View>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#4facfe',
+    // Removed border radius - no border bottom
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 12,
     paddingHorizontal: 8,
+    paddingLeft: 16,
+    paddingRight: 16,
+    paddingBottom: 4,
+    minHeight: 44,
   },
   leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+  },
+  backButton: {
+    marginRight: 6,
   },
   userInfo: {
     flexDirection: 'row',
@@ -78,24 +113,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatar: {
-    marginRight: 12,
+    marginRight: 4,
   },
   textContainer: {
     flex: 1,
   },
   name: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#fff',
     marginBottom: 2,
   },
   status: {
-    fontSize: 14,
-    color: '#e0e0e0',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 6,
   },
 });
 
