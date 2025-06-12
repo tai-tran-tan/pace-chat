@@ -7,17 +7,25 @@ interface Props {
   onSend: (text: string) => void;
   onAttach: () => void;
   onTyping: (isTyping: boolean) => void;
+  onEmoji?: () => void;
+  onRecord?: () => void;
+  onImage?: () => void;
   disabled?: boolean;
+  style?: any;
 }
 
 const MessageInput: React.FC<Props> = ({ 
   onSend, 
   onAttach, 
   onTyping,
-  disabled = false 
+  onEmoji = () => {},
+  onRecord = () => {},
+  onImage = () => {},
+  disabled = false,
+  style
 }) => {
   const [text, setText] = useState('');
-  const typingTimeoutRef = React.useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const handleTextChange = (newText: string) => {
     setText(newText);
@@ -47,6 +55,12 @@ const MessageInput: React.FC<Props> = ({
     }
   }, [text, onSend, disabled, onTyping]);
 
+  const handleImagePress = useCallback(() => {
+    if (!disabled) {
+      onImage();
+    }
+  }, [onImage, disabled]);
+
   // Cleanup typing timeout on unmount
   React.useEffect(() => {
     return () => {
@@ -57,30 +71,35 @@ const MessageInput: React.FC<Props> = ({
   }, []);
 
   return (
-    <View style={styles.container}>
-      <IconButton
-        icon="paperclip"
-        size={24}
-        onPress={onAttach}
-        disabled={disabled}
-        style={styles.attachButton}
-      />
+    <View style={[styles.container, style]}>
+      <IconButton icon="emoticon-outline" size={22} onPress={onEmoji} style={styles.icon} />
       <TextInput
         value={text}
         onChangeText={handleTextChange}
-        placeholder="Type a message..."
-        mode="outlined"
+        placeholder="Message"
+        placeholderTextColor="#999"
+        style={styles.input}
+        underlineColor="transparent"
+        mode="flat"
         multiline
         maxLength={1000}
         disabled={disabled}
-        style={styles.input}
-        right={
-          <TextInput.Icon
-            icon="send"
-            disabled={!text.trim() || disabled}
-            onPress={handleSend}
-          />
-        }
+      />
+      <IconButton icon="paperclip" size={22} onPress={onAttach} style={styles.icon} />
+      <IconButton icon="microphone" size={22} onPress={onRecord} style={styles.icon} />
+      <IconButton 
+        icon="image-outline" 
+        size={22} 
+        onPress={handleImagePress} 
+        style={styles.icon}
+        disabled={disabled}
+      />
+      <IconButton
+        icon="send"
+        size={22}
+        onPress={handleSend}
+        disabled={!text.trim() || disabled}
+        style={styles.icon}
       />
     </View>
   );
@@ -90,18 +109,31 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
-    backgroundColor: '#fff',
+    backgroundColor: '#f7f7f7',
+    borderRadius: 0,
+    margin: 0,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 8,
   },
   input: {
     flex: 1,
-    maxHeight: 100,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
+    fontSize: 16,
+    marginHorizontal: 4,
+    minHeight: 36,
+    maxHeight: 80,
+    borderRadius: 8,
+    paddingVertical: 4,
   },
-  attachButton: {
-    margin: 0,
+  icon: {
+    marginHorizontal: 2,
   },
 });
 

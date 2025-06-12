@@ -1,0 +1,108 @@
+{
+  "common": {
+    "loading": "Đang tải...",
+    "error": "Lỗi",
+    "success": "Thành công",
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "delete": "Xóa",
+    "edit": "Chỉnh sửa",
+    "close": "Đóng",
+    "retry": "Thử lại",
+    "ok": "OK",
+    "yes": "Có",
+    "no": "Không"
+  },
+  "auth": {
+    "login": "Đăng nhập",
+    "register": "Đăng ký",
+    "logout": "Đăng xuất",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "username": "Tên người dùng",
+    "forgotPassword": "Quên mật khẩu?",
+    "loginSuccess": "Đăng nhập thành công",
+    "loginError": "Đăng nhập thất bại",
+    "registerSuccess": "Đăng ký thành công",
+    "registerError": "Đăng ký thất bại"
+  },
+  "chat": {
+    "newMessage": "Tin nhắn mới",
+    "typeMessage": "Nhập tin nhắn...",
+    "send": "Gửi",
+    "online": "Trực tuyến",
+    "offline": "Ngoại tuyến",
+    "away": "Vắng mặt",
+    "typing": "đang nhập...",
+    "lastSeen": "Lần cuối hoạt động",
+    "unreadMessages": "tin nhắn chưa đọc",
+    "markAsRead": "Đánh dấu đã đọc",
+    "deleteMessage": "Xóa tin nhắn",
+    "copyMessage": "Sao chép tin nhắn"
+  },
+  "contacts": {
+    "title": "Danh bạ",
+    "searchContacts": "Tìm kiếm liên hệ...",
+    "noContacts": "Không tìm thấy liên hệ",
+    "addContact": "Thêm liên hệ",
+    "startChat": "Bắt đầu chat",
+    "blockUser": "Chặn người dùng",
+    "unblockUser": "Bỏ chặn người dùng"
+  },
+  "conversations": {
+    "title": "Cuộc trò chuyện",
+    "newConversation": "Cuộc trò chuyện mới",
+    "groupChat": "Chat nhóm",
+    "privateChat": "Chat riêng tư",
+    "noConversations": "Chưa có cuộc trò chuyện nào",
+    "createGroup": "Tạo nhóm",
+    "addParticipants": "Thêm thành viên",
+    "removeParticipants": "Xóa thành viên",
+    "leaveGroup": "Rời nhóm",
+    "deleteGroup": "Xóa nhóm"
+  },
+  "profile": {
+    "title": "Hồ sơ",
+    "editProfile": "Chỉnh sửa hồ sơ",
+    "changeAvatar": "Thay đổi ảnh đại diện",
+    "changePassword": "Đổi mật khẩu",
+    "settings": "Cài đặt",
+    "notifications": "Thông báo",
+    "privacy": "Riêng tư",
+    "about": "Giới thiệu",
+    "version": "Phiên bản"
+  },
+  "settings": {
+    "title": "Cài đặt",
+    "language": "Ngôn ngữ",
+    "theme": "Giao diện",
+    "darkMode": "Chế độ tối",
+    "lightMode": "Chế độ sáng",
+    "systemDefault": "Theo hệ thống",
+    "notifications": "Thông báo",
+    "sound": "Âm thanh",
+    "vibration": "Rung",
+    "privacy": "Riêng tư",
+    "security": "Bảo mật",
+    "about": "Giới thiệu"
+  },
+  "errors": {
+    "networkError": "Lỗi mạng. Vui lòng kiểm tra kết nối.",
+    "serverError": "Lỗi máy chủ. Vui lòng thử lại sau.",
+    "unauthorized": "Không được phép. Vui lòng đăng nhập lại.",
+    "forbidden": "Truy cập bị từ chối.",
+    "notFound": "Không tìm thấy tài nguyên.",
+    "validationError": "Vui lòng kiểm tra thông tin nhập.",
+    "unknownError": "Đã xảy ra lỗi không xác định."
+  },
+  "fileUpload": {
+    "uploading": "Đang tải lên...",
+    "uploadSuccess": "Tải lên thành công",
+    "uploadError": "Tải lên thất bại",
+    "selectImage": "Chọn ảnh",
+    "takePhoto": "Chụp ảnh",
+    "selectFile": "Chọn tệp",
+    "fileTooLarge": "Tệp quá lớn",
+    "unsupportedFormat": "Định dạng tệp không được hỗ trợ"
+  }
+} 

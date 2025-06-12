@@ -1,15 +1,19 @@
 // screens/ChatScreen.tsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, FlatList, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { View, FlatList, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackNavigationProp, ChatScreenRouteProp } from '../types/navigation';
-import ChatHeader from '../components/chat/ChatHeader';
 import MessageInput from '../components/chat/MessageInput';
 import MessageBubble from '../components/chat/MessageBubble';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import ImageViewer from '../components/chat/ImageViewer';
+import ImageActionSheet from '../components/chat/ImageActionSheet';
+import ChatHeader from '../components/common/ChatHeader';
 import socketService from '../services/socket';
 import { useAuthStore } from '../store/useAuthStore';
+import { useWebSocketManager } from '../hooks/useWebSocketManager';
+import { useChatHeaderStore } from '../store/useChatHeaderStore';
 import api from '../services/api';
+import FileUploadService from '../services/fileUpload';
 import { Button } from 'react-native-paper';
 
 type User = {
@@ -46,19 +50,28 @@ type Conversation = {
 };
 
 type ChatScreenParams = {
-  userId: string;
+  conversationId?: string;
+  userId?: string;
   username: string;
 };
 
 const ChatScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
   const route = useRoute<ChatScreenRouteProp>();
-  const { userId, username } = route.params as ChatScreenParams;
+  const { conversationId, userId, username } = route.params as ChatScreenParams;
   const { user } = useAuthStore();
+  const { setChatHeaderProps, clearChatHeaderProps } = useChatHeaderStore();
+
+  // Use WebSocket manager for this chat screen
+  const { isConnected: wsConnected, resetIdleTimer } = useWebSocketManager({
+    autoConnect: true, // Auto connect when entering chat screen
+    idleTimeout: 10 * 60 * 1000, // 10 minutes for chat screen (longer than default)
+    enableIdleDisconnect: true
+  });
 
   // States
   const [conversation, setConversation] = useState<Conversation | null>(null);
-  const [chatId, setChatId] = useState<string | null>(null);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,28 +79,61 @@ const ChatScreen = () => {
   const [hasMore, setHasMore] = useState(true);
   const [lastMessageId, setLastMessageId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string>('');
+  const [imageActionSheetVisible, setImageActionSheetVisible] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
 
+  // Get chat header props
+  const getChatHeaderProps = () => {
+    const chatAvatar = conversation?.type === 'private' 
+      ? conversation.participants.find(p => p.user_id !== user?.user_id)?.avatar_url || `https://i.pravatar.cc/150?img=${currentConversationId}`
+      : "https://i.pravatar.cc/150?img=group";
+    
+    const chatStatus = isTyping ? 'typing...' : wsConnected ? 'online' : 'connecting...';
+    
+    return {
+      avatar: chatAvatar,
+      name: username,
+      status: chatStatus,
+      onBack: handleBack,
+      onCall: () => {
+        // Handle call functionality
+        console.log('Call pressed');
+      },
+      onVideo: () => {
+        // Handle video call functionality
+        console.log('Video call pressed');
+      },
+      onInfo: () => {
+        if (conversation) {
+          navigation.navigate('ChatInfo', {
+            chatId: conversation.conversation_id,
+            name: username,
+            avatar: chatAvatar,
+          });
+        }
+      }
+    };
+  };
+
+  // Auto scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0 && flatListRef.current) {
+      // Small delay to ensure the message is rendered
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages.length]);
+
   // Initialize conversation
   const initializeConversation = useCallback(async () => {
-    if (!userId) {
-      console.error('No target user ID provided');
-      setError('Không tìm thấy người dùng');
-      return;
-    }
-
     if (!user?.user_id) {
       console.error('Current user not logged in');
-      setError('Vui lòng đăng nhập để tiếp tục');
-      return;
-    }
-
-    // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(userId)) {
-      console.error('Invalid user ID format:', userId);
-      setError('ID người dùng không hợp lệ');
+      setError('Please login to continue');
       return;
     }
 
@@ -95,32 +141,46 @@ const ChatScreen = () => {
       setIsLoading(true);
       setError(null);
 
-      console.log('Initializing conversation:', {
+      let finalConversationId = conversationId;
+
+      // If we have userId but no conversationId, create a new conversation
+      if (userId && !conversationId) {
+        console.log('Creating new conversation with user:', {
+          targetUserId: userId,
+          currentUserId: user.user_id
+        });
+
+        const createResponse = await api.post('/conversations/private', {
+          target_user_id: userId
+        });
+
+        console.log('New conversation created:', createResponse.data);
+        finalConversationId = createResponse.data.conversation_id;
+        if (finalConversationId) {
+          setCurrentConversationId(finalConversationId);
+        }
+      } else if (conversationId) {
+        setCurrentConversationId(conversationId);
+      } else {
+        throw new Error('Neither conversationId nor userId provided');
+      }
+
+      console.log('Loading conversation:', {
+        conversationId: finalConversationId,
         currentUserId: user.user_id,
-        targetUserId: userId,
         token: api.defaults.headers.common['Authorization'] ? 'Present' : 'Missing'
       });
 
-      const requestData = {
-        target_user_id: userId
-      };
+      // Get conversation details
+      const conversationResponse = await api.get(`/conversations/${finalConversationId}`);
+      const conversationData = conversationResponse.data;
+      
+      console.log('Conversation response:', conversationData);
 
-      console.log('Request payload:', requestData);
-
-      const response = await api.post('/conversations/private', requestData, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-
-      console.log('Conversation response:', response.data);
-
-      if (!response.data || !response.data.conversation_id) {
+      if (!conversationData || !conversationData.conversation_id) {
         throw new Error('Invalid response format from server');
       }
 
-      const conversationData = response.data;
       setConversation({
         conversation_id: conversationData.conversation_id,
         type: conversationData.type,
@@ -130,62 +190,27 @@ const ChatScreen = () => {
         last_message_timestamp: conversationData.last_message_timestamp,
         unread_count: conversationData.unread_count
       });
-      setChatId(conversationData.conversation_id);
-    } catch (error: any) {
-      console.error('Error initializing conversation:', {
-        error: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        headers: error.response?.headers,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          headers: error.config?.headers,
-          data: error.config?.data
-        }
-      });
 
-      let errorMessage = 'Không thể khởi tạo cuộc trò chuyện. ';
-      
-      if (error.response) {
-        const serverError = error.response.data;
-        console.log('Server error details:', serverError);
-        
-        if (typeof serverError === 'object' && serverError.message) {
-          errorMessage += serverError.message;
-        } else if (error.response.status === 401) {
-          errorMessage += 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-        } else if (error.response.status === 404) {
-          errorMessage += 'Không tìm thấy người dùng.';
-        } else if (error.response.status === 500) {
-          errorMessage += 'Lỗi server. Vui lòng thử lại sau.';
-        } else {
-          errorMessage += `Lỗi server: ${error.response.status}`;
-        }
-      } else if (error.request) {
-        errorMessage += 'Không có phản hồi từ server. Vui lòng kiểm tra kết nối.';
-      } else {
-        errorMessage += error.message || 'Lỗi không xác định';
-      }
-      
-      setError(errorMessage);
+    } catch (error: any) {
+      console.error('Failed to initialize conversation:', error);
+      setError('Failed to load conversation. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [userId, user?.user_id]);
+  }, [conversationId, userId, user?.user_id]);
 
-  // Initialize conversation when component mounts
+  // Initialize conversation on mount
   useEffect(() => {
     initializeConversation();
   }, [initializeConversation]);
 
   // Load messages
   const loadMessages = async (beforeMessageId?: string) => {
-    if (!chatId) return;
+    if (!currentConversationId) return;
 
     try {
       setIsLoading(true);
-      const response = await api.get(`/conversations/${chatId}/messages`, {
+      const response = await api.get(`/conversations/${currentConversationId}/messages`, {
         params: {
           limit: 20,
           before_message_id: beforeMessageId
@@ -198,7 +223,7 @@ const ChatScreen = () => {
         return {
           ...msg,
           sender_name: sender?.username || (msg.sender_id === user?.user_id ? user.username : username),
-          sender_avatar: sender?.avatar_url || (msg.sender_id === user?.user_id ? user.avatar_url : `https://i.pravatar.cc/150?img=${userId}`),
+          sender_avatar: sender?.avatar_url || (msg.sender_id === user?.user_id ? user.avatar_url : `https://i.pravatar.cc/150?img=${msg.sender_id}`),
         };
       });
       
@@ -216,25 +241,32 @@ const ChatScreen = () => {
 
   // Load messages when conversation is ready
   useEffect(() => {
-    if (chatId) {
+    if (conversation) {
       loadMessages();
     }
-  }, [chatId]);
+  }, [conversation]);
 
   // WebSocket message handling
   useEffect(() => {
     const unsubscribe = socketService.onMessage((message) => {
+      // Reset idle timer on any message activity
+      resetIdleTimer();
+      
       switch (message.type) {
         case 'MESSAGE_RECEIVED':
-          if (message.message.conversation_id === chatId) {
+          if (message.message.conversation_id === currentConversationId) {
             setMessages(prev => [...prev, message.message]);
             // Mark message as read
-            socketService.sendReadReceipt(chatId, message.message.message_id);
+            socketService.sendReadReceipt(currentConversationId, message.message.message_id);
+            // Auto scroll to bottom for new received messages
+            setTimeout(() => {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }, 100);
           }
           break;
 
         case 'TYPING_INDICATOR':
-          if (message.conversation_id === chatId && message.user_id !== user?.user_id) {
+          if (message.conversation_id === currentConversationId && message.user_id !== user?.user_id) {
             setIsTyping(message.is_typing);
           }
           break;
@@ -242,64 +274,132 @@ const ChatScreen = () => {
         case 'MESSAGE_DELIVERED':
           // Update message status if needed
           break;
-
-        case 'MESSAGE_READ_STATUS':
-          // Update read status for messages
-          setMessages(prev => prev.map(msg => 
-            msg.message_id === message.message_id
-              ? { ...msg, read_by: [...msg.read_by, message.reader_id] }
-              : msg
-          ));
-          break;
-      }
-    });
-
-    // Handle WebSocket errors and reconnection
-    const unsubscribeError = socketService.onError((error) => {
-      console.error('WebSocket error:', error);
-      setError('Connection error. Reconnecting...');
-    });
-
-    const unsubscribeConnect = socketService.onConnect(() => {
-      setError(null);
-      // Reload messages if needed
-      if (messages.length === 0) {
-        loadMessages();
       }
     });
 
     return () => {
       unsubscribe();
-      unsubscribeError();
-      unsubscribeConnect();
     };
-  }, [chatId, user?.user_id]);
+  }, [currentConversationId, user?.user_id, resetIdleTimer]);
 
+  // Send message
   const handleSend = async (text: string) => {
-    if (!text.trim() || isSending || !chatId) return;
+    if (!text.trim() || !currentConversationId || !wsConnected) return;
 
-    const tempMessageId = `temp_${Date.now()}`;
     try {
       setIsSending(true);
-      
-      // Optimistically add message to UI
+
+      // Create temporary message for immediate UI feedback
+      const tempMessageId = `temp_${Date.now()}`;
       const tempMessage: Message = {
         message_id: tempMessageId,
-        conversation_id: chatId,
-        sender_id: user?.user_id || '',
+        conversation_id: currentConversationId,
+        sender_id: user!.user_id,
         content: text,
         message_type: 'text',
         timestamp: new Date().toISOString(),
         read_by: [],
-        sender_name: user?.username,
-        sender_avatar: user?.avatar_url || `https://i.pravatar.cc/150?img=${user?.user_id}`,
+        sender_name: user!.username,
+        sender_avatar: user!.avatar_url || undefined
       };
-      
+
+      // Add temporary message to UI
       setMessages(prev => [...prev, tempMessage]);
-      flatListRef.current?.scrollToEnd({ animated: true });
 
       // Send message through WebSocket
-      const serverMessageId = await socketService.sendMessage(chatId, text);
+      const serverMessageId = await socketService.sendMessage(
+        currentConversationId, 
+        text, 
+        'text'
+      );
+
+      // Replace temporary message with server message
+      setMessages(prev => prev.map(msg => 
+        msg.message_id === tempMessageId
+          ? { ...msg, message_id: serverMessageId }
+          : msg
+      ));
+
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      // Remove temporary message on error
+      setMessages(prev => prev.filter(msg => !msg.message_id.startsWith('temp_')));
+      Alert.alert('Error', 'Failed to send message. Please try again.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Handle image sending
+  const handleSendImage = async () => {
+    setImageActionSheetVisible(true);
+  };
+
+  const handleImageFromCamera = async () => {
+    setImageActionSheetVisible(false);
+    try {
+      const imageUri = await FileUploadService.takePhoto();
+      if (imageUri) {
+        await uploadAndSendImage(imageUri);
+      }
+    } catch (error) {
+      console.error('Failed to take photo:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    }
+  };
+
+  const handleImageFromGallery = async () => {
+    setImageActionSheetVisible(false);
+    try {
+      const imageUri = await FileUploadService.pickImage();
+      if (imageUri) {
+        await uploadAndSendImage(imageUri);
+      }
+    } catch (error) {
+      console.error('Failed to pick image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const uploadAndSendImage = async (imageUri: string) => {
+    if (!currentConversationId || !wsConnected) return;
+
+    try {
+      setIsUploading(true);
+
+      // Create temporary message for immediate UI feedback
+      const tempMessageId = `temp_img_${Date.now()}`;
+      const tempMessage: Message = {
+        message_id: tempMessageId,
+        conversation_id: currentConversationId,
+        sender_id: user!.user_id,
+        content: imageUri, // Use local URI temporarily
+        message_type: 'image',
+        timestamp: new Date().toISOString(),
+        read_by: [],
+        sender_name: user!.username,
+        sender_avatar: user!.avatar_url || undefined
+      };
+
+      // Add temporary message to UI
+      setMessages(prev => [...prev, tempMessage]);
+
+      // Upload image to server
+      const uploadResponse = await FileUploadService.uploadFile(imageUri);
+      
+      // Update temp message with actual image URL
+      setMessages(prev => prev.map(msg => 
+        msg.message_id === tempMessageId
+          ? { ...msg, content: uploadResponse.file_url }
+          : msg
+      ));
+
+      // Send image message through WebSocket
+      const serverMessageId = await socketService.sendMessage(
+        currentConversationId!, 
+        uploadResponse.file_url,
+        'image'
+      );
       
       // Update message with server ID
       setMessages(prev => prev.map(msg => 
@@ -308,18 +408,32 @@ const ChatScreen = () => {
           : msg
       ));
     } catch (error) {
-      console.error('Failed to send message:', error);
-      setError('Failed to send message. Please try again.');
-      // Remove failed message
-      setMessages(prev => prev.filter(msg => msg.message_id !== tempMessageId));
+      console.error('Failed to upload image:', error);
+      // Remove temporary message on error
+      setMessages(prev => prev.filter(msg => !msg.message_id.startsWith('temp_img_')));
+      Alert.alert('Error', 'Failed to upload image. Please try again.');
     } finally {
-      setIsSending(false);
+      setIsUploading(false);
     }
   };
 
+  const handleImagePress = (imageUrl: string) => {
+    setSelectedImageUrl(imageUrl);
+    setImageViewerVisible(true);
+  };
+
+  const handleCloseImageViewer = () => {
+    setImageViewerVisible(false);
+    setSelectedImageUrl('');
+  };
+
   const handleTyping = (isTyping: boolean) => {
-    if (!chatId) return;
-    socketService.sendTypingIndicator(chatId, isTyping);
+    if (!currentConversationId) return;
+    
+    // Reset idle timer on typing activity
+    resetIdleTimer();
+    
+    socketService.sendTypingIndicator(currentConversationId, isTyping);
   };
 
   const handleLoadMore = () => {
@@ -334,96 +448,106 @@ const ChatScreen = () => {
 
   if (error) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
         <View style={{ padding: 24, backgroundColor: '#ffeaea', borderRadius: 12, alignItems: 'center', maxWidth: 320 }}>
           <Text style={{ color: '#d32f2f', fontWeight: 'bold', fontSize: 16, marginBottom: 12, textAlign: 'center' }}>
             {error}
           </Text>
           <Button mode="contained" onPress={initializeConversation} style={{ marginTop: 8 }}>
-            Thử lại
+            Try Again
           </Button>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
-  if (!conversation || !chatId) {
-    // Đang khởi tạo hoặc chưa có conversation, chỉ hiện loading
+  if (!conversation) {
+    // Initializing or no conversation yet, show loading only
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
         <ActivityIndicator size="large" color="#2196F3" />
-        <Text style={{ marginTop: 16, color: '#666' }}>Đang khởi tạo cuộc trò chuyện...</Text>
-      </SafeAreaView>
+        <Text style={{ marginTop: 16, color: '#666' }}>Initializing conversation...</Text>
+      </View>
     );
   }
+
+  const chatHeaderProps = getChatHeaderProps();
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
-      <View style={styles.container}>
-        <ChatHeader
-          avatar={`https://i.pravatar.cc/150?img=${userId}`}
-          name={username}
-          status={isTyping ? 'typing...' : 'online'}
-          onBack={handleBack}
-          onCall={() => {}}
-          onVideo={() => {}}
-          onInfo={() => {
-            if (conversation) {
-              navigation.navigate('ChatInfo', {
-                chatId: conversation.conversation_id,
-                name: username,
-                avatar: `https://i.pravatar.cc/150?img=${userId}`,
-              });
+    <View style={styles.container}>
+      <ChatHeader {...chatHeaderProps} />
+      
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={80}
+      >
+        {isLoading && messages.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={item => item.message_id}
+            renderItem={({ item }) => (
+              <MessageBubble
+                text={item.content}
+                isMine={item.sender_id === user?.user_id}
+                timestamp={new Date(item.timestamp).toLocaleTimeString([], { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })}
+                isRead={item?.read_by?.length > 0}
+                messageType={item.message_type}
+                onImagePress={() => item.message_type === 'image' ? handleImagePress(item.content) : undefined}
+                isUploading={item.message_id.startsWith('temp_img_')}
+              />
+            )}
+            contentContainerStyle={[
+              styles.messages,
+              messages.length === 0 && { flex: 1, justifyContent: 'center' }
+            ]}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              isLoading && messages.length > 0 ? (
+                <ActivityIndicator style={styles.loadingMore} />
+              ) : null
             }
-          }}
-        />
-
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={80}
-        >
-          {isLoading && messages.length === 0 ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" />
-            </View>
-          ) : (
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              keyExtractor={item => item.message_id}
-              renderItem={({ item }) => (
-                <MessageBubble
-                  text={item.content}
-                  isMine={item.sender_id === user?.user_id}
-                  timestamp={new Date(item.timestamp).toLocaleTimeString([], { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
-                  isRead={item.read_by.length > 0}
-                />
-              )}
-              contentContainerStyle={styles.messages}
-              onEndReached={handleLoadMore}
-              onEndReachedThreshold={0.5}
-              ListFooterComponent={
-                isLoading && messages.length > 0 ? (
-                  <ActivityIndicator style={styles.loadingMore} />
-                ) : null
-              }
-              inverted={false}
-            />
-          )}
-
-          <MessageInput
-            onSend={handleSend}
-            onAttach={() => {}}
-            onTyping={handleTyping}
-            disabled={isSending || !chatId}
+            inverted={false}
+            showsVerticalScrollIndicator={false}
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+              autoscrollToTopThreshold: 10,
+            }}
           />
-        </KeyboardAvoidingView>
-      </View>
-    </SafeAreaView>
+        )}
+
+        <MessageInput
+          onSend={handleSend}
+          onAttach={() => {}}
+          onTyping={handleTyping}
+          onImage={handleSendImage}
+          disabled={isSending || isUploading || !currentConversationId || !wsConnected}
+          style={{marginBottom: 16, marginHorizontal: 8}}
+        />
+      </KeyboardAvoidingView>
+
+      <ImageViewer
+        visible={imageViewerVisible}
+        imageUrl={selectedImageUrl}
+        onClose={handleCloseImageViewer}
+      />
+
+      <ImageActionSheet
+        visible={imageActionSheetVisible}
+        onClose={() => setImageActionSheetVisible(false)}
+        onCamera={handleImageFromCamera}
+        onGallery={handleImageFromGallery}
+      />
+    </View>
   );
 };
 

@@ -1,116 +1,110 @@
 // components/chat/ChatItem.tsx
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Text, Surface } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 
 type ChatItemProps = {
   name: string;
-  lastMessage: string;
-  timestamp: string;
-  unreadCount: number;
-  avatar: string;
-  onPress: () => void;
+  avatar?: string | React.ReactNode;
+  subtitle?: string;
+  timestamp?: string;
+  unreadCount?: number;
+  isOnline?: boolean;
+  onPress?: () => void;
+  rightAction?: React.ReactNode;
+  style?: any;
 };
 
 const ChatItem = ({
   name,
-  lastMessage,
+  avatar,
+  subtitle,
   timestamp,
   unreadCount,
-  avatar,
+  isOnline = false,
   onPress,
+  rightAction,
+  style,
 }: ChatItemProps) => {
   return (
-    <TouchableOpacity onPress={onPress} style={styles.container}>
-      <Surface style={styles.surface}>
-        <Image source={{ uri: avatar }} style={styles.avatar} />
-        
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.name} numberOfLines={1}>
-              {name}
-            </Text>
-            <Text style={styles.timestamp}>{timestamp}</Text>
+    <TouchableOpacity onPress={onPress} style={[styles.container, style]}>
+      <View style={styles.avatarWrapper}>
+        {typeof avatar === 'string' ? (
+          <Image source={{ uri: 'https://i.pravatar.cc/50' || avatar }} style={styles.avatar} />
+        ) : (
+          avatar
+        )}
+        {isOnline && <View style={styles.onlineDot} />}
+      </View>
+      <View style={styles.content}>
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name} numberOfLines={1}>{name}</Text>
+            {subtitle && <Text style={styles.lastMessage} numberOfLines={1}>{subtitle}</Text>}
           </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.lastMessage} numberOfLines={1}>
-              {lastMessage}
-            </Text>
-            {unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </Text>
-              </View>
-            )}
-          </View>
+          {!!timestamp && <Text style={styles.timestamp}>{timestamp}</Text>}
+          {rightAction}
         </View>
-      </Surface>
+      </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 4,
-  },
-  surface: {
     flexDirection: 'row',
-    padding: 12,
-    borderRadius: 12,
-    elevation: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginRight: 12,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  onlineDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#2ecc40',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   content: {
     flex: 1,
     justifyContent: 'center',
   },
-  header: {
+  row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
   },
   name: {
+    fontWeight: 'bold',
     fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-    marginRight: 8,
+    color: '#222',
+    flexShrink: 1,
   },
   timestamp: {
     fontSize: 12,
-    color: '#666',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    color: '#999',
+    marginLeft: 8,
+    alignSelf: 'center',
   },
   lastMessage: {
     fontSize: 14,
     color: '#666',
-    flex: 1,
-    marginRight: 8,
-  },
-  badge: {
-    backgroundColor: '#2196F3',
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    marginTop: 2,
+    flexShrink: 1,
   },
 });
 

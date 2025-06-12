@@ -1,211 +1,170 @@
-import React, { useRef, useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Provider as PaperProvider } from 'react-native-paper';
-import { IconButton } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from './store/useAuthStore';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useWebSocketManager } from './hooks/useWebSocketManager';
+import socketService from './services/socket';
+import api from './services/api';
+
+// Import i18n configuration
+import './i18n';
+import { LanguageProvider } from './contexts/LanguageContext';
 
 // Screens
 import AuthScreen from './screens/AuthScreen';
-import HomeScreen from './screens/HomeScreen';
-import ChatScreen from './screens/ChatScreen';
-import NewChatScreen from './screens/NewChatScreen';
-import NotificationScreen from './screens/NotificationScreen';
-import ChatInfoScreen from './screens/ChatInfoScreen';
-import ProfileScreen from './screens/ProfileScreen';
+import MainNavigator from './components/common/MainNavigator';
 
 // Types
-type RootStackParamList = {
-  Auth: undefined;
-  Main: undefined;
-  Chat: { chatId: string; name: string };
-  NewChat: undefined;
-  ChatInfo: { chatId: string };
-};
-
-type MainTabParamList = {
-  Home: undefined;
-  Notifications: undefined;
-  Profile: undefined;
-};
+import type { RootStackParamList } from './types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// Tạo navigation ref để có thể truy cập từ bất kỳ đâu
-export const navigationRef = React.createRef<any>();
+// Component to handle WebSocket errors with navigation
+const WebSocketErrorHandler = () => {
+  const navigation = useNavigation<any>();
+  const { logout } = useAuthStore();
 
-// Export hàm navigate để sử dụng từ bất kỳ đâu
-export function navigate(name: string, params?: any) {
-  navigationRef.current?.navigate(name, params);
-}
-
-// Export hàm reset để sử dụng từ bất kỳ đâu
-export function resetToAuth() {
-  navigationRef.current?.reset({
-    index: 0,
-    routes: [{ name: 'Auth' }],
-  });
-}
-
-const MainTabs = () => {
-  return (
-    <Tab.Navigator
-      screenOptions={{
-        tabBarActiveTintColor: '#2196F3',
-        tabBarInactiveTintColor: '#666',
-        headerShown: false,
-      }}
-    >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          tabBarLabel: 'Trò chuyện',
-          tabBarIcon: ({ color, size }) => (
-            <IconButton icon="chat" size={size} iconColor={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Notifications"
-        component={NotificationScreen}
-        options={{
-          tabBarLabel: 'Thông báo',
-          tabBarIcon: ({ color, size }) => (
-            <IconButton icon="bell" size={size} iconColor={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          tabBarLabel: 'Tôi',
-          tabBarIcon: ({ color, size }) => (
-            <IconButton icon="account" size={size} iconColor={color} />
-          ),
-        }}
-      />
-    </Tab.Navigator>
-  );
-};
-
-const AppContent = () => {
-  const { isAuthenticated, setUser, setToken, setRefreshToken } = useAuthStore();
-
-  // Kiểm tra session khi app khởi động
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        // Kiểm tra token và user data
-        const [token, refreshToken, userData] = await Promise.all([
-          AsyncStorage.getItem('access_token'),
-          AsyncStorage.getItem('refresh_token'),
-          AsyncStorage.getItem('user')
-        ]);
-
-        if (!token || !userData) {
-          console.log('Không tìm thấy session, chuyển về màn Auth');
-          resetToAuth();
-          return;
-        }
-
-        // Parse user data
-        const user = JSON.parse(userData);
+    // Register a global error handler for WebSocket authentication/session errors
+    const unsubscribe = socketService.onError((error) => {
+      // If the error message indicates authentication failure or session expiration, logout and navigate to AuthScreen
+      if (
+        error?.message?.includes('Authentication failed') ||
+        error?.message?.includes('User session expired')
+      ) {
+        logout();
         
-        // Cập nhật state
-        setToken(token);
-        setRefreshToken(refreshToken);
-        setUser(user);
-
-        console.log('Session đã được khôi phục:', {
-          hasToken: !!token,
-          hasRefreshToken: !!refreshToken,
-          username: user.username
-        });
-      } catch (error) {
-        console.error('Lỗi khi kiểm tra session:', error);
-        resetToAuth();
+        // Check if we're already on Auth screen to avoid unnecessary navigation
+        const currentRoute = navigation.getCurrentRoute();
+        if (currentRoute?.name !== 'Auth') {
+          // Reset navigation stack to AuthScreen only if not already there
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Auth' }]
+          });
+        }
       }
+    });
+    return () => {
+      // Cleanup the error handler on unmount
+      unsubscribe && unsubscribe();
     };
+  }, [navigation, logout]);
 
-    checkSession();
-  }, []);
-
-  // Kiểm tra authentication state thay đổi
-  useEffect(() => {
-    if (!isAuthenticated) {
-      console.log('Không còn authenticated, chuyển về màn Auth');
-      resetToAuth();
-    }
-  }, [isAuthenticated]);
-
-  return (
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
-        {!isAuthenticated ? (
-          <Stack.Screen 
-            name="Auth" 
-            component={AuthScreen}
-            options={{
-              gestureEnabled: false, // Vô hiệu hóa gesture back
-            }}
-          />
-        ) : (
-          <>
-            <Stack.Screen 
-              name="Main" 
-              component={MainTabs}
-              options={{
-                gestureEnabled: false, // Vô hiệu hóa gesture back
-              }}
-            />
-            <Stack.Screen
-              name="Chat"
-              component={ChatScreen}
-              options={({ route }) => ({
-                headerShown: true,
-                title: route.params?.name || 'Chat',
-              })}
-            />
-            <Stack.Screen
-              name="NewChat"
-              component={NewChatScreen}
-              options={{
-                headerShown: true,
-                title: 'Cuộc trò chuyện mới',
-              }}
-            />
-            <Stack.Screen
-              name="ChatInfo"
-              component={ChatInfoScreen}
-              options={{
-                headerShown: true,
-                title: 'Thông tin chat',
-              }}
-            />
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
+  return null;
 };
 
 const App = () => {
+  const { isAuthenticated, user, initializeAuth } = useAuthStore();
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Global WebSocket manager for app-level connection
+  const { isConnected: wsConnected } = useWebSocketManager({
+    autoConnect: false, // Don't auto connect globally, let screens handle it
+    idleTimeout: 15 * 60 * 1000, // 15 minutes for app level
+    enableIdleDisconnect: true
+  });
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        console.log('Initializing app...');
+        
+        // Check for stored auth token
+        const token = await initializeAuth();
+        
+        if (token) {
+          console.log('Found stored token, setting up API client');
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          
+          // Validate token with server
+          try {
+            const response = await api.get('/auth/me');
+            console.log('Token validation successful:', response.data);
+          } catch (error: any) {
+            console.error('Token validation failed:', error.response?.status);
+            if (error.response?.status === 401) {
+              console.log('Token expired, clearing auth state');
+              // Token is invalid, clear auth state
+              useAuthStore.getState().logout();
+            }
+          }
+        } else {
+          console.log('No stored token found');
+        }
+      } catch (error) {
+        console.error('Error during app initialization:', error);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initializeApp();
+  }, [initializeAuth]);
+
+  // Handle authentication state changes
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('User authenticated, setting up WebSocket connection');
+      
+      // Set up API client with auth token
+      const token = useAuthStore.getState().token;
+      if (token) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Connect WebSocket if not already connected
+      if (!socketService.isConnected()) {
+        socketService.connect().catch(error => {
+          console.error('Failed to connect WebSocket after login:', error);
+        });
+      }
+    } else {
+      console.log('User not authenticated, disconnecting WebSocket');
+      
+      // Clear API auth header
+      delete api.defaults.headers.common['Authorization'];
+      
+      // Disconnect WebSocket
+      if (socketService.isConnected()) {
+        socketService.disconnect();
+      }
+    }
+  }, [isAuthenticated, user]);
+
+  if (isInitializing) {
+    return null; // Or a loading screen
+  }
+
   return (
-    <PaperProvider>
-      <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}> 
-        <AppContent />
-      </SafeAreaView>
-    </PaperProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <LanguageProvider>
+          <PaperProvider>
+            <NavigationContainer>
+              <StatusBar style="auto" />
+              <WebSocketErrorHandler />
+              <Stack.Navigator
+                screenOptions={{
+                  headerShown: false,
+                  animation: 'slide_from_right',
+                }}
+              >
+                {!isAuthenticated ? (
+                  <Stack.Screen name="Auth" component={AuthScreen} />
+                ) : (
+                  <Stack.Screen name="Home" component={MainNavigator} />
+                )}
+              </Stack.Navigator>
+            </NavigationContainer>
+          </PaperProvider>
+        </LanguageProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 };
 

@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 
-// Cấu hình API URL dựa trên platform
+// Configure API URL based on platform
 const API_URL = Platform.select({
   ios: 'http://localhost:8080/v1',     // iOS Simulator
   android: 'http://10.0.2.2:8080/v1',  // Android Emulator
@@ -13,9 +13,9 @@ const API_URL = Platform.select({
 console.log('Platform:', Platform.OS);
 console.log('API URL:', API_URL);
 
-// Cấu hình timeout và retry
-const TIMEOUT = 30000; // Tăng timeout lên 30 giây
-const MAX_RETRIES = 2; // Số lần retry tối đa
+// Configure timeout and retry
+const TIMEOUT = 30000; // Increase timeout to 30 seconds
+const MAX_RETRIES = 2; // Maximum retry attempts
 
 // Create axios instance
 const api = axios.create({
@@ -27,7 +27,7 @@ const api = axios.create({
   },
 });
 
-// Hàm retry request
+// Retry request function
 const retryRequest = async (config: any, retryCount = 0): Promise<any> => {
   try {
     return await api(config);
@@ -37,7 +37,7 @@ const retryRequest = async (config: any, retryCount = 0): Promise<any> => {
       (error.message.includes('timeout') || error.message === 'Network Error')
     ) {
       console.log(`Retrying request (${retryCount + 1}/${MAX_RETRIES}):`, config.url);
-      // Tăng timeout cho mỗi lần retry
+      // Increase timeout for each retry
       const newConfig = {
         ...config,
         timeout: TIMEOUT * (retryCount + 2)
@@ -86,23 +86,27 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // Get message from server if available
+    const serverMessage = error.response?.data?.message;
+    const errorMessage = serverMessage || error.message;
+
     console.error('API Error:', {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,
-      message: error.message,
+      message: errorMessage,
       data: error.response?.data,
       isNetworkError: !error.response && error.message === 'Network Error',
       timeout: error.config?.timeout
     });
 
-    // Xử lý timeout
+    // Handle timeout
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
       console.log('Request timeout, attempting retry...');
       try {
         return await retryRequest(error.config);
       } catch (retryError) {
-        throw new Error('Không thể kết nối đến server sau nhiều lần thử. Vui lòng thử lại sau.');
+        throw new Error('Unable to connect to server after multiple attempts. Please try again later.');
       }
     }
 
@@ -111,11 +115,17 @@ api.interceptors.response.use(
         await fetch(API_URL + '/health');
       } catch (e) {
         console.error('Server is not reachable:', e);
-        throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng của bạn.');
+        throw new Error('Unable to connect to server. Please check your network connection.');
       }
     }
 
     if (error.response?.status === 401) {
+      // If it's a login/register error, throw error with message from server
+      if (error.config?.url === '/auth/login' || error.config?.url === '/auth/register') {
+        throw new Error(errorMessage);
+      }
+
+      // If it's a token expiration error, try to refresh token
       try {
         const refreshToken = useAuthStore.getState().refreshToken;
         if (refreshToken) {
@@ -136,18 +146,12 @@ api.interceptors.response.use(
       } catch (refreshError) {
         console.error('Token refresh failed:', refreshError);
         useAuthStore.getState().logout();
-        throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        throw new Error('Login session expired. Please login again.');
       }
     }
 
-    // Xử lý các lỗi khác
-    if (error.response?.data?.message) {
-      throw new Error(error.response.data.message);
-    } else if (error.message === 'Network Error') {
-      throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng của bạn.');
-    } else {
-      throw error;
-    }
+    // Handle other errors
+    throw new Error(errorMessage);
   }
 );
 
@@ -181,12 +185,18 @@ export const authApi = {
       console.log('Login successful, tokens stored');
       return response.data;
     } catch (error: any) {
+      // Get message from server if available
+      const serverMessage = error.response?.data?.message;
+      const errorMessage = serverMessage || error.message;
+      
       console.error('Login failed:', {
         status: error.response?.status,
-        message: error.response?.data?.message || error.message,
+        message: errorMessage,
         data: error.response?.data
       });
-      throw error;
+      
+      // Throw error with message from server
+      throw new Error(errorMessage);
     }
   },
 

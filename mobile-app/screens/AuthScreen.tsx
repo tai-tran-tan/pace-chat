@@ -61,6 +61,11 @@ const AuthScreen = () => {
         await login(username, password);
       } else {
         await register(username, password, email);
+        setMode('login');
+        setUsername('');
+        setPassword('');
+        setEmail('');
+        setFormError('');
       }
     } catch (error) {
       // Error is handled in store
@@ -86,7 +91,7 @@ const AuthScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView 
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
