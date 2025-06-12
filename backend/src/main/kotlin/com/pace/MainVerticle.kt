@@ -1,8 +1,8 @@
+// src/main/kotlin/com/pacechat/MainVerticle.kt
 package com.pace
 
-import com.pace.config.Configuration
-import com.pace.config.ConfigurationService
 import com.pace.data.db.DbAccessible
+import com.pace.data.db.impl.InMemoryDatabase
 import com.pace.router.AuthRouter
 import com.pace.router.ConversationRouter
 import com.pace.router.MessageRouter
@@ -13,7 +13,6 @@ import com.pace.ws.ConnectionsManager
 import com.pace.ws.WebSocketHandler
 import io.klogging.java.LoggerFactory
 import io.vertx.core.AbstractVerticle
-import io.vertx.core.http.HttpMethod
 import io.vertx.core.http.HttpServerOptions
 import io.vertx.ext.auth.JWTOptions
 import io.vertx.ext.auth.PubSecKeyOptions
@@ -23,25 +22,16 @@ import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.CorsHandler
 import io.vertx.ext.web.handler.JWTAuthHandler
-import kotlinx.serialization.json.Json
-import kotlin.reflect.full.createInstance
 
 class MainVerticle : AbstractVerticle() {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
     private var jwtService: JwtService = JwtService()
-    private lateinit var db: DbAccessible
+    private val db: DbAccessible = InMemoryDatabase()
+    private val connectionsManager = ConnectionsManager(db)
+    private lateinit var jwtAuthProvider: JWTAuth
 
     override fun start() {
-        ConfigurationService.getConfig(vertx).onSuccess { config ->
-            val conf = Json.decodeFromString<Configuration>(config.toString())
-            bootstrap(conf)
-        }.onFailure { err ->
-            logger.error(err) { "Failed to get configuration" }
-        }
-    }
-
-    private fun bootstrap(config: Configuration) {
         // Configure JWT Auth Provider for Vert.x Web
         // In a real app, use asymmetric keys or a more robust key store.
         // For simulation, we'll use a symmetric key directly.
@@ -53,12 +43,12 @@ class MainVerticle : AbstractVerticle() {
             )
             .setJWTOptions(
                 JWTOptions()
-                    .setExpiresInMinutes(JwtConfig.tokenExpirySeconds.toInt())
+                    .setExpiresInMinutes(JwtConfig.tokenExpirySeconds.toLong().toInt())
                     .setAlgorithm("HS256")
                     .setIssuer(JwtConfig.issuer)
                     .setAudience(listOf(JwtConfig.audience))
             )
-        val jwtAuthProvider = JWTAuth.create(vertx, jwtAuthOptions)
+        jwtAuthProvider = JWTAuth.create(vertx, jwtAuthOptions)
 
         // Setup HTTP Router
         val router = Router.router(vertx)
@@ -67,11 +57,11 @@ class MainVerticle : AbstractVerticle() {
         router.route().handler(
             CorsHandler.create()
                 .addOriginWithRegex(".*") // Allow all origins (for development)
-                .allowedMethod(HttpMethod.GET)
-                .allowedMethod(HttpMethod.POST)
-                .allowedMethod(HttpMethod.PUT)
-                .allowedMethod(HttpMethod.DELETE)
-                .allowedMethod(HttpMethod.PATCH)
+                .allowedMethod(io.vertx.core.http.HttpMethod.GET)
+                .allowedMethod(io.vertx.core.http.HttpMethod.POST)
+                .allowedMethod(io.vertx.core.http.HttpMethod.PUT)
+                .allowedMethod(io.vertx.core.http.HttpMethod.DELETE)
+                .allowedMethod(io.vertx.core.http.HttpMethod.PATCH)
                 .allowedHeader("Authorization")
                 .allowedHeader("Content-Type")
                 .allowCredentials(true)
@@ -80,7 +70,6 @@ class MainVerticle : AbstractVerticle() {
         // Body Handler to parse request bodies (JSON)
         router.route().handler(BodyHandler.create())
 
-        db = Class.forName(config.database.dataSourceClass).kotlin.createInstance() as DbAccessible
         // Public routes
         AuthRouter(router, jwtService, db).setupRoutes()
 
@@ -98,7 +87,6 @@ class MainVerticle : AbstractVerticle() {
             }
         }
 
-        val connectionsManager = ConnectionsManager(db)
         UserRouter(protectedRouter, db).setupRoutes()
         ConversationRouter(protectedRouter, db, connectionsManager).setupRoutes()
         MessageRouter(protectedRouter, db).setupRoutes()
@@ -120,7 +108,7 @@ class MainVerticle : AbstractVerticle() {
                 logger.info("HTTP and WebSocket server started on port 8080")
             }
             .onFailure { err ->
-                logger.error(err) { "Failed to start HTTP/WebSocket server: ${err.cause?.message}" }
+                println("Failed to start HTTP/WebSocket server: ${err.cause?.message}")
             }
     }
 }

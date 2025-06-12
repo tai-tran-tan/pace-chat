@@ -62,9 +62,6 @@ dependencies {
     implementation("io.vertx:vertx-lang-kotlin-coroutines:$vertxVersion")
     implementation("io.vertx:vertx-lang-kotlin:$vertxVersion")
 
-    implementation("io.vertx:vertx-config:$vertxVersion")
-    implementation("io.vertx:vertx-config-hocon:$vertxVersion")
-
     // Logging
 //    implementation("ch.qos.logback:logback-classic:1.4.14")
 //    implementation("io.github.microutils:kotlin-logging:3.0.5") // For easy Kotlin logging

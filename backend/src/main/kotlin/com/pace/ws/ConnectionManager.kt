@@ -24,7 +24,7 @@ class ConnectionsManager(private val db: DbAccessible) {
 
     fun sendMessageToUser(userId: String, message: String) {
         val connection = connections[userId]
-        if (connection != null && !connection.session.isClosed) {
+        if (connection != null && connection.session.isClosed == false) {
             connection.session.writeTextMessage(message)
             logger.debug("Sent message to user $userId: $message")
         } else {
@@ -34,7 +34,7 @@ class ConnectionsManager(private val db: DbAccessible) {
 
     fun broadcastMessage(message: String, excludeConnection: Connection? = null) {
         connections.values.forEach { connection ->
-            if (connection != excludeConnection && !connection.session.isClosed) {
+            if (connection != excludeConnection && connection.session.isClosed == false) {
                 connection.session.writeTextMessage(message)
             }
         }
