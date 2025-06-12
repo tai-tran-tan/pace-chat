@@ -1,11 +1,11 @@
 // src/main/kotlin/com/pacechat/websocket/ConnectionsManager.kt
 package com.pace.ws
 
-import com.pace.data.InMemoryDatabase
+import com.pace.data.db.DbAccessible
 import io.klogging.java.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
-object ConnectionsManager {
+class ConnectionsManager(private val db: DbAccessible) {
     private val logger = LoggerFactory.getLogger(this::class.java)
     // Using userId -> Connection for quick lookup and managing authenticated sessions
     private val connections = ConcurrentHashMap<String, Connection>()
@@ -24,7 +24,7 @@ object ConnectionsManager {
 
     fun sendMessageToUser(userId: String, message: String) {
         val connection = connections[userId]
-        if (connection != null && connection.session.isClosed == false) {
+        if (connection != null && !connection.session.isClosed) {
             connection.session.writeTextMessage(message)
             logger.debug("Sent message to user $userId: $message")
         } else {
@@ -34,7 +34,7 @@ object ConnectionsManager {
 
     fun broadcastMessage(message: String, excludeConnection: Connection? = null) {
         connections.values.forEach { connection ->
-            if (connection != excludeConnection && connection.session.isClosed == false) {
+            if (connection != excludeConnection && !connection.session.isClosed) {
                 connection.session.writeTextMessage(message)
             }
         }
@@ -42,7 +42,7 @@ object ConnectionsManager {
     }
 
     fun broadcastMessageToConversationParticipants(conversationId: String, message: String) {
-        val conversation = InMemoryDatabase.findConversationById(conversationId)
+        val conversation = db.findConversationById(conversationId)
         if (conversation != null) {
             conversation.participants.forEach { participant ->
                 sendMessageToUser(participant.userId, message)

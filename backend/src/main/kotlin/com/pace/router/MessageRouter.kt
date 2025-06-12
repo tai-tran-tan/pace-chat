@@ -1,7 +1,7 @@
 // src/main/kotlin/com/pacechat/router/MessageRouter.kt
 package com.pace.router
 
-import com.pace.data.InMemoryDatabase
+import com.pace.data.db.DbAccessible
 import com.pace.data.model.FileUploadResponse
 import com.pace.data.model.MessagesHistoryResponse
 import io.klogging.java.LoggerFactory
@@ -11,7 +11,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.UUID
 
-class MessageRouter(private val router: Router) {
+class MessageRouter(private val router: Router, private val db: DbAccessible) {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -22,14 +22,14 @@ class MessageRouter(private val router: Router) {
             val limit = rc.request().getParam("limit")?.toIntOrNull() ?: 50
             val beforeMessageId = rc.request().getParam("before_message_id")
 
-            val conversation = InMemoryDatabase.findConversationById(conversationId)
+            val conversation = db.findConversationById(conversationId)
             if (conversation == null || !conversation.participants.any { it.userId == userId }) {
                 rc.response().setStatusCode(404).end(Json.encodeToString(mapOf("message" to "Conversation not found or not accessible")))
                 return@coroutineHandler
             }
 
-            val messages = InMemoryDatabase.getMessagesForConversation(conversationId, limit, beforeMessageId)
-            val hasMore = InMemoryDatabase.hasMoreMessages(conversationId, messages.firstOrNull()?.messageId)
+            val messages = db.getMessagesForConversation(conversationId, limit, beforeMessageId)
+            val hasMore = db.hasMoreMessages(conversationId, messages.firstOrNull()?.messageId)
             val nextBeforeMessageId = if (hasMore && messages.isNotEmpty()) messages.first().messageId else null
 
             rc.response().setStatusCode(200).end(Json.encodeToString(MessagesHistoryResponse(messages, hasMore, nextBeforeMessageId)))

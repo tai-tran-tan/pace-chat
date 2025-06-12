@@ -1,7 +1,7 @@
 // src/main/kotlin/com/pacechat/router/ConversationRouter.kt
 package com.pace.router
 
-import com.pace.data.InMemoryDatabase
+import com.pace.data.db.DbAccessible
 import com.pace.data.model.ConversationGroupCreateRequest
 import com.pace.data.model.ConversationGroupParticipantsUpdate
 import com.pace.data.model.ConversationPrivateRequest
@@ -12,21 +12,21 @@ import io.vertx.ext.web.Router
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-class ConversationRouter(private val router: Router) {
+class ConversationRouter(private val router: Router, private val db: DbAccessible, private val connectionsManager: ConnectionsManager) {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     fun setupRoutes() {
         router.get("/conversations").coroutineHandler { rc ->
             val userId = rc.get<String>("userId")
-            val conversations = InMemoryDatabase.getConversationsForUser(userId)
+            val conversations = db.getConversationsForUser(userId)
             rc.response().setStatusCode(200).end(Json.encodeToString(conversations))
         }
 
         router.get("/conversations/:conversationId").coroutineHandler { rc ->
             val userId = rc.get<String>("userId")
             val conversationId = rc.pathParam("conversationId")
-            val conversation = InMemoryDatabase.findConversationById(conversationId)
+            val conversation = db.findConversationById(conversationId)
 
             if (conversation == null || !conversation.participants.any { it.userId == userId }) {
                 rc.response().setStatusCode(404).end(Json.encodeToString(mapOf("message" to "Conversation not found or not accessible")))
@@ -38,7 +38,7 @@ class ConversationRouter(private val router: Router) {
         router.post("/conversations/private").coroutineHandler { rc ->
             val userId = rc.get<String>("userId")
             val request = Json.decodeFromString<ConversationPrivateRequest>(rc.body().asString())
-            val targetUser = InMemoryDatabase.findUserById(request.targetUserId)
+            val targetUser = db.findUserById(request.targetUserId)
 
             if (targetUser == null) {
                 rc.response().setStatusCode(404).end(Json.encodeToString(mapOf("message" to "Target user not found")))
@@ -49,13 +49,13 @@ class ConversationRouter(private val router: Router) {
                 return@coroutineHandler
             }
 
-            val existingConv = InMemoryDatabase.findPrivateConversation(userId, targetUser.userId)
+            val existingConv = db.findPrivateConversation(userId, targetUser.userId)
             if (existingConv != null) {
                 rc.response().setStatusCode(200).end(Json.encodeToString(existingConv))
                 return@coroutineHandler
             }
 
-            val newConversation = InMemoryDatabase.createPrivateConversation(userId, targetUser.userId)
+            val newConversation = db.createPrivateConversation(userId, targetUser.userId)
             rc.response().setStatusCode(201).end(Json.encodeToString(newConversation))
             logger.info("Private conversation created between $userId and ${targetUser.userId}")
         }
@@ -69,13 +69,13 @@ class ConversationRouter(private val router: Router) {
                 return@coroutineHandler
             }
 
-            val allParticipantsExist = request.participantIds.all { id -> InMemoryDatabase.findUserById(id) != null }
+            val allParticipantsExist = request.participantIds.all { id -> db.findUserById(id) != null }
             if (!allParticipantsExist) {
                 rc.response().setStatusCode(400).end(Json.encodeToString(mapOf("message" to "One or more participants not found.")))
                 return@coroutineHandler
             }
 
-            val newConversation = InMemoryDatabase.createGroupConversation(userId, request.name, request.participantIds)
+            val newConversation = db.createGroupConversation(userId, request.name, request.participantIds)
             rc.response().setStatusCode(201).end(Json.encodeToString(newConversation))
             logger.info("Group conversation '${newConversation.name}' created by $userId")
         }
@@ -85,13 +85,13 @@ class ConversationRouter(private val router: Router) {
             val conversationId = rc.pathParam("conversationId")
             val request = rc.body().asPojo(ConversationGroupParticipantsUpdate::class.java)
 
-            val conversation = InMemoryDatabase.findConversationById(conversationId)
+            val conversation = db.findConversationById(conversationId)
             if (conversation == null || conversation.type != "group" || !conversation.participants.any { it.userId == userId }) {
                 rc.response().setStatusCode(404).end(Json.encodeToString(mapOf("message" to "Group conversation not found or not accessible")))
                 return@coroutineHandler
             }
 
-            val updatedConversation = InMemoryDatabase.updateGroupParticipants(
+            val updatedConversation = db.updateGroupParticipants(
                 conversationId,
                 request.addIds,
                 request.removeIds
@@ -103,13 +103,13 @@ class ConversationRouter(private val router: Router) {
 
                 // Notify WebSocket clients about conversation update
                 request.addIds.forEach { addedParticipantId ->
-                    ConnectionsManager.broadcastMessageToConversationParticipants(
+                    connectionsManager.broadcastMessageToConversationParticipants(
                         conversationId,
                         Json.encodeToString(WsMessage.ConversationUpdate(conversationId = conversationId, changeType = "participant_added", participantId = addedParticipantId))
                     )
                 }
                 request.removeIds.forEach { removedParticipantId ->
-                    ConnectionsManager.broadcastMessageToConversationParticipants(
+                    connectionsManager.broadcastMessageToConversationParticipants(
                         conversationId,
                         Json.encodeToString(WsMessage.ConversationUpdate(conversationId= conversationId, changeType =  "participant_removed", participantId = removedParticipantId))
                     )

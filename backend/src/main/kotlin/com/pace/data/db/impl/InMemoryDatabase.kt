@@ -1,5 +1,6 @@
-package com.pace.data
+package com.pace.data.db.impl
 
+import com.pace.data.db.DbAccessible
 import com.pace.data.model.Conversation
 import com.pace.data.model.DeviceToken
 import com.pace.data.model.Message
@@ -12,7 +13,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
-object InMemoryDatabase {
+internal class InMemoryDatabase : DbAccessible {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     // Using ConcurrentHashMap for map-like data structures that might be modified concurrently
@@ -26,7 +27,7 @@ object InMemoryDatabase {
     private val messages = CopyOnWriteArrayList<Message>() // Good for frequently read, infrequently written lists
     private val deviceTokens = CopyOnWriteArrayList<DeviceToken>()
 
-    fun init() {
+    init {
         // Clear previous data if init is called multiple times
         users.clear()
         conversations.clear()
@@ -38,9 +39,33 @@ object InMemoryDatabase {
         val bobId = "b1c2d3e4-f5a6-7890-1234-567890abcdef"
         val charlieId = "c1d2e3f4-a5b6-7890-1234-567890abcdef"
 
-        val alice = User(aliceId, "alice", "alice@example.com", "password123", "online", "https://placehold.co/50x50/ff0000/ffffff?text=A", null)
-        val bob = User(bobId, "bob", "bob@example.com", "password123", "offline", "https://placehold.co/50x50/00ff00/ffffff?text=B", Instant.parse("2025-06-06T14:00:00Z"))
-        val charlie = User(charlieId, "charlie", "charlie@example.com", "password123", "online", "https://placehold.co/50x50/0000ff/ffffff?text=C", null)
+        val alice = User(
+            aliceId,
+            "alice",
+            "alice@example.com",
+            "password123",
+            "online",
+            "https://placehold.co/50x50/ff0000/ffffff?text=A",
+            null
+        )
+        val bob = User(
+            bobId,
+            "bob",
+            "bob@example.com",
+            "password123",
+            "offline",
+            "https://placehold.co/50x50/00ff00/ffffff?text=B",
+            Instant.Companion.parse("2025-06-06T14:00:00Z")
+        )
+        val charlie = User(
+            charlieId,
+            "charlie",
+            "charlie@example.com",
+            "password123",
+            "online",
+            "https://placehold.co/50x50/0000ff/ffffff?text=C",
+            null
+        )
 
         users[aliceId] = alice
         users[bobId] = bob
@@ -57,7 +82,7 @@ object InMemoryDatabase {
             null,
             listOf(alicePublic, bobPublic),
             "Hey Bob!",
-            Instant.parse("2025-06-06T13:00:00Z"),
+            Instant.Companion.parse("2025-06-06T13:00:00Z"),
             0
         )
         conversations[privateConvId] = privateConv
@@ -69,28 +94,70 @@ object InMemoryDatabase {
             "Dev Team",
             listOf(alicePublic, bobPublic, charliePublic),
             "Daily standup at 9 AM.",
-            Instant.parse("2025-06-05T09:00:00Z"),
+            Instant.Companion.parse("2025-06-05T09:00:00Z"),
             1
         )
         conversations[groupConvId] = groupConv
 
-        messages.add(Message("msg-pvt-1", privateConvId, aliceId, "Hi Bob!", "text", Instant.parse("2025-06-06T12:58:00Z"), mutableListOf(bobId)))
-        messages.add(Message("msg-pvt-2", privateConvId, bobId, "Hey Alice!", "text", Instant.parse("2025-06-06T13:00:00Z"), mutableListOf()))
-        messages.add(Message("msg-group-1", groupConvId, aliceId, "Good morning team!", "text", Instant.parse("2025-06-05T08:55:00Z"), mutableListOf(bobId)))
-        messages.add(Message("msg-group-2", groupConvId, charlieId, "Daily standup at 9 AM.", "text", Instant.parse("2025-06-05T09:00:00Z"), mutableListOf()))
+        messages.add(
+            Message(
+                "msg-pvt-1",
+                privateConvId,
+                aliceId,
+                "Hi Bob!",
+                "text",
+                Instant.Companion.parse("2025-06-06T12:58:00Z"),
+                mutableListOf(bobId)
+            )
+        )
+        messages.add(
+            Message(
+                "msg-pvt-2",
+                privateConvId,
+                bobId,
+                "Hey Alice!",
+                "text",
+                Instant.Companion.parse("2025-06-06T13:00:00Z"),
+                mutableListOf()
+            )
+        )
+        messages.add(
+            Message(
+                "msg-group-1",
+                groupConvId,
+                aliceId,
+                "Good morning team!",
+                "text",
+                Instant.Companion.parse("2025-06-05T08:55:00Z"),
+                mutableListOf(bobId)
+            )
+        )
+        messages.add(
+            Message(
+                "msg-group-2",
+                groupConvId,
+                charlieId,
+                "Daily standup at 9 AM.",
+                "text",
+                Instant.Companion.parse("2025-06-05T09:00:00Z"),
+                mutableListOf()
+            )
+        )
 
         logger.info("InMemoryDatabase initialized with dummy data.")
     }
 
     // --- User Operations ---
-    fun registerUser(username: String, email: String, password: String): User {
+    override fun registerUser(username: String, email: String, password: String): User {
         val newUser = User(
             userId = UUID.randomUUID().toString(),
             username = username,
             email = email,
             password = password,
             status = "offline",
-            avatarUrl = "https://placehold.co/50x50/${(0..0xFFFFFF).random().toString(16).padStart(6, '0')}/ffffff?text=${username.first().uppercase()}",
+            avatarUrl = "https://placehold.co/50x50/${
+                (0..0xFFFFFF).random().toString(16).padStart(6, '0')
+            }/ffffff?text=${username.first().uppercase()}",
             lastSeen = null
         )
         users[newUser.userId] = newUser
@@ -98,27 +165,27 @@ object InMemoryDatabase {
         return newUser
     }
 
-    fun authenticateUser(username: String, password: String): User? {
+    override fun authenticateUser(username: String, password: String): User? {
         return users.values.find { it.username == username && it.password == password }
     }
 
-    fun findUserById(userId: String): User? {
+    override fun findUserById(userId: String): User? {
         return users[userId]
     }
 
-    fun findUserByUsername(username: String): User? {
+    override fun findUserByUsername(username: String): User? {
         return users.values.find { it.username == username }
     }
 
-    fun findUserByEmail(email: String): User? {
+    override fun findUserByEmail(email: String): User? {
         return users.values.find { it.email == email }
     }
 
-    fun searchUsers(query: String): List<User> {
+    override fun searchUsers(query: String): List<User> {
         return users.values.filter { it.username.contains(query, ignoreCase = true) || it.email.contains(query, ignoreCase = true) }
     }
 
-    fun updateUserProfile(userId: String, username: String?, email: String?, avatarUrl: String?): User? {
+    override fun updateUserProfile(userId: String, username: String?, email: String?, avatarUrl: String?): User? {
         val user = users[userId]
         user?.apply {
             if (username != null) this.username = username
@@ -129,30 +196,30 @@ object InMemoryDatabase {
         return user
     }
 
-    fun updateUserStatus(userId: String, status: String, lastSeen: Instant?) {
+    override fun updateUserStatus(userId: String, status: String, lastSeen: Instant?) {
         users[userId]?.apply {
             this.status = status
             this.lastSeen = lastSeen
         }
     }
 
-    fun addDeviceToken(userId: String, deviceToken: String, platform: String) {
+    override fun addDeviceToken(userId: String, deviceToken: String, platform: String) {
         deviceTokens.add(DeviceToken(userId, deviceToken, platform, Clock.System.now()))
         // In a real app, you might want to replace existing tokens for a user/platform
     }
 
     // --- Conversation Operations ---
-    fun getConversationsForUser(userId: String): List<Conversation> {
+    override fun getConversationsForUser(userId: String): List<Conversation> {
         return conversations.values
             .filter { conv -> conv.participants.any { it.userId == userId } }
             .sortedByDescending { it.lastMessageTimestamp?.toJavaInstant() ?: java.time.Instant.MIN }
     }
 
-    fun findConversationById(conversationId: String): Conversation? {
+    override fun findConversationById(conversationId: String): Conversation? {
         return conversations[conversationId]
     }
 
-    fun findPrivateConversation(user1Id: String, user2Id: String): Conversation? {
+    override fun findPrivateConversation(user1Id: String, user2Id: String): Conversation? {
         return conversations.values.find { conv ->
             conv.type == "private" &&
                     conv.participants.size == 2 &&
@@ -161,7 +228,7 @@ object InMemoryDatabase {
         }
     }
 
-    fun createPrivateConversation(user1Id: String, user2Id: String): Conversation {
+    override fun createPrivateConversation(user1Id: String, user2Id: String): Conversation {
         val user1 = users[user1Id]!!.toUserPublic()
         val user2 = users[user2Id]!!.toUserPublic()
         val newConv = Conversation(
@@ -178,7 +245,7 @@ object InMemoryDatabase {
         return newConv
     }
 
-    fun createGroupConversation(creatorId: String, name: String, participantIds: List<String>): Conversation {
+    override fun createGroupConversation(creatorId: String, name: String, participantIds: List<String>): Conversation {
         val participantsList = participantIds.mapNotNull { findUserById(it)?.toUserPublic() }
         val newConv = Conversation(
             conversationId = UUID.randomUUID().toString(),
@@ -194,7 +261,7 @@ object InMemoryDatabase {
         return newConv
     }
 
-    fun updateGroupParticipants(conversationId: String, addIds: List<String>?, removeIds: List<String>?): Conversation? {
+    override fun updateGroupParticipants(conversationId: String, addIds: List<String>?, removeIds: List<String>?): Conversation? {
         val conversation = conversations[conversationId]
         conversation?.let { conv ->
             if (conv.type != "group") return null
@@ -224,7 +291,7 @@ object InMemoryDatabase {
     }
 
     // --- Message Operations ---
-    fun getMessagesForConversation(conversationId: String, limit: Int, beforeMessageId: String?): List<Message> {
+    override fun getMessagesForConversation(conversationId: String, limit: Int, beforeMessageId: String?): List<Message> {
         var filteredMessages = messages.filter { it.conversationId == conversationId }
             .sortedBy { it.timestamp } // Ensure sorted by timestamp ascending
 
@@ -238,7 +305,7 @@ object InMemoryDatabase {
         return filteredMessages.takeLast(limit) // Return the last 'limit' messages
     }
 
-    fun hasMoreMessages(conversationId: String, oldestMessageId: String?): Boolean {
+    override fun hasMoreMessages(conversationId: String, oldestMessageId: String?): Boolean {
         if (oldestMessageId == null) return false
         val allMessages = messages.filter { it.conversationId == conversationId }
             .sortedBy { it.timestamp }
@@ -247,7 +314,7 @@ object InMemoryDatabase {
         return index > 0 // If index is > 0, there are messages before it
     }
 
-    fun addMessage(
+    override fun addMessage(
         conversationId: String,
         senderId: String,
         content: String,
@@ -279,7 +346,7 @@ object InMemoryDatabase {
         return newMessage
     }
 
-    fun markMessagesAsRead(conversationId: String, lastReadMessageId: String, readerId: String): List<Message> {
+    override fun markMessagesAsRead(conversationId: String, lastReadMessageId: String, readerId: String): List<Message> {
         val updatedMessages = mutableListOf<Message>()
         val relevantMessages = messages
             .filter { it.conversationId == conversationId }
