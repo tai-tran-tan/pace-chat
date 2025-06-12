@@ -1,0 +1,89 @@
+version: "3.3"
+networks:
+  cassandra-pace:
+    driver: bridge
+
+services:
+  cassandra-db:
+    image: "cassandra:5.0.4"
+    container_name: "cassandra-db"
+    ports:
+      - 7000:7000
+    networks:
+      - cassandra-pace
+    environment:
+      - CASSANDRA_CLUSTER_NAME=pace-cluster
+    volumes:
+      - cassandra-pace:/var/lib/cassandra:rw
+    restart:
+      on-failure
+    # healthcheck:
+    #   test: ["CMD-SHELL", "nodetool status"]
+    #   interval: 2m
+    #   start_period: 2m
+    #   timeout: 10s
+    #   retries: 3
+  coordinator:
+    image: stargateio/coordinator-4_0:v2
+    depends_on:
+      - cassandra-db
+    networks:
+      - cassandra-pace
+    ports:
+      - "9042:9042"
+      - "8081:8081"
+      - "8084:8084"
+      - "8090:8090"
+    mem_limit: 2G
+    environment:
+      - JAVA_OPTS="-Xmx2G"
+      - CLUSTER_NAME=pace-cluster
+      # - CLUSTER_VERSION=4.0
+      # - RACK_NAME=rack1
+      # - DATACENTER_NAME=datacenter1
+      - ENABLE_AUTH=true
+      - DEVELOPER_MODE=true
+  restapi:
+    image: stargateio/restapi:v2
+    depends_on:
+      - coordinator
+    networks:
+      - cassandra-pace
+    ports:
+      - "8082:8082"
+    mem_limit: 2G
+    environment:
+      - QUARKUS_GRPC_CLIENTS_BRIDGE_HOST=coordinator
+      - QUARKUS_GRPC_CLIENTS_BRIDGE_PORT=8091
+      - QUARKUS_HTTP_ACCESS_LOG_ENABLED=${REQUESTLOG}
+      - QUARKUS_LOG_LEVEL=${LOGLEVEL}
+  graphqlapi:
+    image: stargateio/graphqlapi:v2
+    depends_on:
+      - coordinator
+    networks:
+      - cassandra-pace
+    ports:
+      - "8080:8080"
+    mem_limit: 2G
+    environment:
+      - QUARKUS_GRPC_CLIENTS_BRIDGE_HOST=coordinator
+      - QUARKUS_GRPC_CLIENTS_BRIDGE_PORT=8091
+      - QUARKUS_HTTP_ACCESS_LOG_ENABLED=${REQUESTLOG}
+      - QUARKUS_LOG_LEVEL=${LOGLEVEL}
+  docsapi:
+    image: stargateio/docsapi:v2
+    depends_on:
+      - coordinator
+    networks:
+      - cassandra-pace
+    ports:
+      - "8180:8180"
+    mem_limit: 2G
+    environment:
+      - QUARKUS_GRPC_CLIENTS_BRIDGE_HOST=coordinator
+      - QUARKUS_GRPC_CLIENTS_BRIDGE_PORT=8091
+      - QUARKUS_HTTP_ACCESS_LOG_ENABLED=${REQUESTLOG}
+      - QUARKUS_LOG_LEVEL=${LOGLEVEL}
+volumes:
+  cassandra-pace:
