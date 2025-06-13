@@ -10,6 +10,7 @@ import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -17,7 +18,7 @@ import kotlinx.serialization.json.Json
 class WebSocketHandler(
     private val vertx: io.vertx.core.Vertx,
     private val jwtService: JwtService,
-    private val inMemoryDatabase: DbAccessible,
+    private val db: DbAccessible,
     private val connectionsManager: ConnectionsManager
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
@@ -38,14 +39,16 @@ class WebSocketHandler(
             if (authenticatedUserId != null) {
                 connectionsManager.removeConnection(authenticatedUserId!!)
                 // Update user status to offline and broadcast presence
-                inMemoryDatabase.updateUserStatus(authenticatedUserId!!, "offline", Clock.System.now())
+                runBlocking { db.updateUserStatus(authenticatedUserId!!, "offline", Clock.System.now()) }
                 CoroutineScope(vertx.dispatcher()).launch {
                     connectionsManager.broadcastMessage(
-                        json.encodeToString(WsMessage.WsPresenceUpdate(
-                            userId = authenticatedUserId!!,
-                            status = WsMessage.UserStatus.OFFLINE,
-                            lastSeen = Clock.System.now()
-                        )),
+                        json.encodeToString(
+                            WsMessage.WsPresenceUpdate(
+                                userId = authenticatedUserId!!,
+                                status = WsMessage.UserStatus.OFFLINE,
+                                lastSeen = Clock.System.now()
+                            )
+                        ),
                         excludeConnection = null
                     )
                 }
@@ -79,10 +82,16 @@ class WebSocketHandler(
                         connectionsManager.addConnection(connection)
 
                         // Update user status to online and broadcast presence
-                        inMemoryDatabase.updateUserStatus(authenticatedUserId, "online", null)
+                        runBlocking { db.updateUserStatus(authenticatedUserId, "online", null) }
                         CoroutineScope(vertx.dispatcher()).launch {
                             connectionsManager.broadcastMessage(
-                                json.encodeToString(WsMessage.WsPresenceUpdate(userId = authenticatedUserId, status = WsMessage.UserStatus.ONLINE, lastSeen = Clock.System.now())),
+                                json.encodeToString(
+                                    WsMessage.WsPresenceUpdate(
+                                        userId = authenticatedUserId,
+                                        status = WsMessage.UserStatus.ONLINE,
+                                        lastSeen = Clock.System.now()
+                                    )
+                                ),
                                 excludeConnection = null
                             )
                         }
@@ -108,33 +117,46 @@ class WebSocketHandler(
                         json.decodeFromString<WsMessage>(messageText)
                     } catch (e: Exception) {
                         logger.error("Failed to deserialize WS message: ${e.message}", e)
-                        ws.writeTextMessage(json.encodeToString(mapOf("type" to "ERROR", "message" to "Invalid message format.")))
+                        ws.writeTextMessage(
+                            json.encodeToString(
+                                mapOf(
+                                    "type" to "ERROR",
+                                    "message" to "Invalid message format."
+                                )
+                            )
+                        )
                         return@handler
                     }
 
                     when (wsMessage.type) {
                         WsMessage.EventType.SEND_MESSAGE -> {
                             val messageData = wsMessage as WsMessage.SendMessage
-                            val newMessage = inMemoryDatabase.addMessage(
-                                messageData.conversationId,
-                                authenticatedUserId,
-                                messageData.content,
-                                messageData.messageType,
-                                messageData.clientMessageId
-                            )
+                            val newMessage = runBlocking {
+                                db.addMessage(
+                                    messageData.conversationId,
+                                    authenticatedUserId,
+                                    messageData.content,
+                                    messageData.messageType,
+                                    messageData.clientMessageId
+                                )
+                            }
                             CoroutineScope(vertx.dispatcher()).launch {
                                 if (newMessage != null) {
                                     // Send MESSAGE_DELIVERED ACK back to the sender
-                                    ws.writeTextMessage(json.encodeToString(WsMessage.MessageDelivered(
-                                        WsMessage.EventType.MESSAGE_DELIVERED,
-                                        messageData.clientMessageId,
-                                        newMessage.messageId,
-                                        newMessage.timestamp,
-                                        "success"
-                                    )))
+                                    ws.writeTextMessage(
+                                        json.encodeToString(
+                                            WsMessage.MessageDelivered(
+                                                WsMessage.EventType.MESSAGE_DELIVERED,
+                                                messageData.clientMessageId,
+                                                newMessage.messageId,
+                                                newMessage.timestamp,
+                                                "success"
+                                            )
+                                        )
+                                    )
 
                                     // Broadcast MESSAGE_RECEIVED to other participants
-                                    val conversation = inMemoryDatabase.findConversationById(messageData.conversationId)
+                                    val conversation = db.findConversationById(messageData.conversationId)
                                     if (conversation != null) {
                                         conversation.participants.forEach { participant ->
                                             if (participant.userId != authenticatedUserId) { // Exclude sender
@@ -147,72 +169,97 @@ class WebSocketHandler(
                                     }
                                     logger.info("Message sent: ${newMessage.messageId} in ${newMessage.conversationId}")
                                 } else {
-                                    ws.writeTextMessage(json.encodeToString(WsMessage.MessageDelivered(
-                                        WsMessage.EventType.MESSAGE_DELIVERED,
-                                        messageData.clientMessageId,
-                                        "N/A", // No server ID on failure
-                                        Clock.System.now(),
-                                        "failure"
-                                    )))
+                                    ws.writeTextMessage(
+                                        json.encodeToString(
+                                            WsMessage.MessageDelivered(
+                                                WsMessage.EventType.MESSAGE_DELIVERED,
+                                                messageData.clientMessageId,
+                                                "N/A", // No server ID on failure
+                                                Clock.System.now(),
+                                                "failure"
+                                            )
+                                        )
+                                    )
                                     logger.warn("Failed to add message to DB.")
                                 }
                             }
                         }
+
                         WsMessage.EventType.TYPING_INDICATOR -> {
                             val typingData = wsMessage as WsMessage.TypingIndicator
-                            val conversation = inMemoryDatabase.findConversationById(typingData.conversationId)
+                            val conversation = runBlocking { db.findConversationById(typingData.conversationId) }
                             if (conversation != null) {
                                 CoroutineScope(vertx.dispatcher()).launch {
                                     conversation.participants.forEach { participant ->
                                         if (participant.userId != authenticatedUserId) { // Exclude sender
                                             connectionsManager.sendMessageToUser(
                                                 participant.userId,
-                                                json.encodeToString(WsMessage.TypingIndicator(
-                                                    WsMessage.EventType.TYPING_INDICATOR,
-                                                    typingData.conversationId,
-                                                    authenticatedUserId,
-                                                    typingData.isTyping
-                                                ))
+                                                json.encodeToString(
+                                                    WsMessage.TypingIndicator(
+                                                        WsMessage.EventType.TYPING_INDICATOR,
+                                                        typingData.conversationId,
+                                                        authenticatedUserId,
+                                                        typingData.isTyping
+                                                    )
+                                                )
                                             )
                                         }
                                     }
                                 }
                             }
                         }
+
                         WsMessage.EventType.READ_RECEIPT -> {
                             val readReceiptData = wsMessage as WsMessage.ReadReceipt
                             val conversationId = readReceiptData.conversationId
                             val lastReadMessageId = readReceiptData.lastReadMessageId
                             val readerId = authenticatedUserId!!
 
-                            inMemoryDatabase.markMessagesAsRead(conversationId, lastReadMessageId, readerId)
+                            runBlocking { db.markMessagesAsRead(conversationId, lastReadMessageId, readerId) }
 
-                            val conversation = inMemoryDatabase.findConversationById(conversationId)
+                            val conversation = runBlocking { db.findConversationById(conversationId) }
                             if (conversation != null) {
                                 CoroutineScope(vertx.dispatcher()).launch {
                                     connectionsManager.broadcastMessageToConversationParticipants(
                                         conversationId,
-                                        json.encodeToString(WsMessage.WsMessageReadStatus(
-                                            WsMessage.EventType.MESSAGE_READ_STATUS,
-                                            conversationId,
-                                            lastReadMessageId,
-                                            readerId,
-                                            Clock.System.now()
-                                        ))
+                                        json.encodeToString(
+                                            WsMessage.WsMessageReadStatus(
+                                                WsMessage.EventType.MESSAGE_READ_STATUS,
+                                                conversationId,
+                                                lastReadMessageId,
+                                                readerId,
+                                                Clock.System.now()
+                                            )
+                                        )
                                     )
                                 }
                             }
                             logger.info("Read receipt from $authenticatedUsername for conv $conversationId up to $lastReadMessageId")
                         }
+
                         else -> {
                             logger.warn("Unhandled authenticated WebSocket message type: ${wsMessage.type}")
-                            ws.writeTextMessage(json.encodeToString(mapOf("type" to "ERROR", "message" to "Unhandled message type: ${wsMessage.type}")))
+                            ws.writeTextMessage(
+                                json.encodeToString(
+                                    mapOf(
+                                        "type" to "ERROR",
+                                        "message" to "Unhandled message type: ${wsMessage.type}"
+                                    )
+                                )
+                            )
                         }
                     }
                 }
             } catch (e: Exception) {
                 logger.error("Error processing WebSocket message: ${e.message}. Message: $messageText", e)
-                ws.writeTextMessage(json.encodeToString(mapOf("type" to "ERROR", "message" to "Server error processing message.")))
+                ws.writeTextMessage(
+                    json.encodeToString(
+                        mapOf(
+                            "type" to "ERROR",
+                            "message" to "Server error processing message."
+                        )
+                    )
+                )
             }
         }
 
@@ -221,11 +268,15 @@ class WebSocketHandler(
             logger.error("WebSocket exception for user ${authenticatedUsername ?: ws.remoteAddress()}: ${t.message}", t)
             if (authenticatedUserId != null) {
                 connectionsManager.removeConnection(authenticatedUserId)
-                inMemoryDatabase.updateUserStatus(authenticatedUserId, "offline", Clock.System.now())
+                runBlocking { db.updateUserStatus(authenticatedUserId, "offline", Clock.System.now()) }
                 CoroutineScope(vertx.dispatcher()).launch {
                     connectionsManager.broadcastMessage(
-                        json.encodeToString(WsMessage.WsPresenceUpdate(userId = authenticatedUserId,
-                             status = WsMessage.UserStatus.ONLINE, lastSeen = Clock.System.now())),
+                        json.encodeToString(
+                            WsMessage.WsPresenceUpdate(
+                                userId = authenticatedUserId,
+                                status = WsMessage.UserStatus.ONLINE, lastSeen = Clock.System.now()
+                            )
+                        ),
                         excludeConnection = null
                     )
                 }

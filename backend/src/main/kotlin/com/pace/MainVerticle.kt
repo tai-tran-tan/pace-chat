@@ -1,8 +1,12 @@
 package com.pace
 
+import com.google.inject.Guice
 import com.pace.config.Configuration
 import com.pace.config.ConfigurationService
 import com.pace.data.db.DbAccessible
+import com.pace.data.db.impl.CommonDbService
+import com.pace.data.storage.DataSource
+import com.pace.injection.module.BasicGuiceModule
 import com.pace.router.AuthRouter
 import com.pace.router.ConversationRouter
 import com.pace.router.MessageRouter
@@ -24,24 +28,27 @@ import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.CorsHandler
 import io.vertx.ext.web.handler.JWTAuthHandler
 import kotlinx.serialization.json.Json
-import kotlin.reflect.full.createInstance
 
 class MainVerticle : AbstractVerticle() {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
     private var jwtService: JwtService = JwtService()
     private lateinit var db: DbAccessible
-
     override fun start() {
+        val injector = Guice.createInjector(BasicGuiceModule(vertx))
         ConfigurationService.getConfig(vertx).onSuccess { config ->
             val conf = Json.decodeFromString<Configuration>(config.toString())
-            bootstrap(conf)
+            val srcClass = conf.database.let { Class.forName(it.dataSourceClass) }
+            db = CommonDbService(
+                injector.getInstance(srcClass) as DataSource
+            )
+            bootstrap()
         }.onFailure { err ->
             logger.error(err) { "Failed to get configuration" }
         }
     }
 
-    private fun bootstrap(config: Configuration) {
+    private fun bootstrap() {
         // Configure JWT Auth Provider for Vert.x Web
         // In a real app, use asymmetric keys or a more robust key store.
         // For simulation, we'll use a symmetric key directly.
@@ -80,7 +87,6 @@ class MainVerticle : AbstractVerticle() {
         // Body Handler to parse request bodies (JSON)
         router.route().handler(BodyHandler.create())
 
-        db = Class.forName(config.database.dataSourceClass).kotlin.createInstance() as DbAccessible
         // Public routes
         AuthRouter(router, jwtService, db).setupRoutes()
 

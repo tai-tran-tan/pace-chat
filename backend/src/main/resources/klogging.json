@@ -1,3 +1,4 @@
 {
-  "configName": "DEFAULT_CONSOLE"
+  "configName": "DEFAULT_CONSOLE",
+  "minDirectLogLevel": "DEBUG"
 }
