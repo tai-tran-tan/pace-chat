@@ -12,6 +12,7 @@ interface ConversationState {
 interface ConversationActions {
   fetchConversations: (isRefresh?: boolean) => Promise<void>;
   setConversations: (convs: Conversation[]) => void;
+  updateConversationLastMessage: (conversationId: string, lastMessage: any) => void;
   clearError: () => void;
 }
 
@@ -54,5 +55,19 @@ export const useConversationStore = create<ConversationState & ConversationActio
   },
 
   setConversations: (convs) => set({ conversations: convs }),
+  
+  updateConversationLastMessage: (conversationId, lastMessage) => {
+    set((state) => ({
+      conversations: state.conversations.map((conv) =>
+        conv.conversation_id === conversationId
+          ? {
+              ...conv,
+              last_message: lastMessage,
+            }
+          : conv
+      ),
+    }));
+  },
+
   clearError: () => set({ error: null }),
 })); 

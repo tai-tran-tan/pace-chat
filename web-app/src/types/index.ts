@@ -14,7 +14,7 @@ export interface User {
 export interface Conversation {
   conversation_id: string;
   name?: string | null;
-  type: 'direct' | 'group';
+  type: 'private' | 'group';
   participants: ConversationParticipant[];
   last_message?: Message | null;
   unread_count: number;

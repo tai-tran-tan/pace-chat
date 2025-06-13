@@ -174,102 +174,106 @@ class WebSocketService {
     this.isConnecting = true;
     console.log('WebSocket: Attempting to connect to:', this.WS_URL);
 
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        throw new Error('No access token available');
-      }
+    return new Promise((resolve, reject) => {
+      try {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+          throw new Error('No access token available');
+        }
 
-      console.log('WebSocket: Creating native WebSocket connection...');
+        console.log('WebSocket: Creating native WebSocket connection...');
 
-      // Create native WebSocket connection
-      this.ws = new WebSocket(this.WS_URL);
+        // Create native WebSocket connection
+        this.ws = new WebSocket(this.WS_URL);
 
-      // Add connection timeout
-      const connectionTimeout = setTimeout(() => {
-        if (this.ws?.readyState === WebSocket.CONNECTING) {
-          console.error('WebSocket: Connection timeout after 10 seconds');
-          this.ws?.close();
+        // Add connection timeout
+        const connectionTimeout = setTimeout(() => {
+          if (this.ws?.readyState === WebSocket.CONNECTING) {
+            console.error('WebSocket: Connection timeout after 10 seconds');
+            this.ws?.close();
+            this.isConnecting = false;
+            this.notifyErrorHandlers(new Error('Connection timeout'));
+            reject(new Error('Connection timeout'));
+          }
+        }, 10000);
+
+        this.ws.onopen = () => {
+          clearTimeout(connectionTimeout);
+          console.log('WebSocket: Connection established successfully');
+          console.log('WebSocket: ReadyState after open:', this.ws?.readyState);
           this.isConnecting = false;
-          this.notifyErrorHandlers(new Error('Connection timeout'));
-        }
-      }, 10000);
-
-      this.ws.onopen = () => {
-        clearTimeout(connectionTimeout);
-        console.log('WebSocket: Connection established successfully');
-        console.log('WebSocket: ReadyState after open:', this.ws?.readyState);
-        this.isConnecting = false;
-        this.reconnectAttempts = 0;
-        this.updateActivity();
-        console.log('WebSocket: About to authenticate...');
-        this.authenticate(token);
-        this.startPingPong();
-        this.notifyConnectionHandlers();
-      };
-
-      this.ws.onmessage = (event) => {
-        try {
-          console.log('WebSocket: Raw message received:', event.data);
-          const message = JSON.parse(event.data) as WsMessage;
-          console.log('WebSocket: Parsed message received:', JSON.stringify(message, null, 2));
-          console.log('WebSocket: Message type:', message.type);
+          this.reconnectAttempts = 0;
           this.updateActivity();
-          
-          // Handle ping/pong
-          if (message.type === 'PONG') {
-            if (this.pongTimeout) {
-              clearTimeout(this.pongTimeout);
-              this.pongTimeout = null;
+          console.log('WebSocket: About to authenticate...');
+          this.authenticate(token);
+          this.startPingPong();
+          this.notifyConnectionHandlers();
+          resolve();
+        };
+
+        this.ws.onmessage = (event) => {
+          try {
+            console.log('WebSocket: Raw message received:', event.data);
+            const message = JSON.parse(event.data) as WsMessage;
+            console.log('WebSocket: Parsed message received:', JSON.stringify(message, null, 2));
+            console.log('WebSocket: Message type:', message.type);
+            this.updateActivity();
+            
+            // Handle ping/pong
+            if (message.type === 'PONG') {
+              if (this.pongTimeout) {
+                clearTimeout(this.pongTimeout);
+                this.pongTimeout = null;
+              }
+              return;
             }
-            return;
+            
+            // Handle authentication response
+            if (message.type === 'AUTH_SUCCESS') {
+              this.isAuthenticated = true;
+              console.log('WebSocket: Authentication successful!');
+              console.log('WebSocket: Auth success message:', JSON.stringify(message, null, 2));
+            } else if (message.type === 'AUTH_FAILURE') {
+              this.isAuthenticated = false;
+              console.error('WebSocket: Authentication failed:', message.reason);
+              console.error('WebSocket: Auth failure message:', JSON.stringify(message, null, 2));
+              this.disconnect();
+              this.notifyErrorHandlers(new Error(`Authentication failed: ${message.reason}`));
+              return;
+            }
+            
+            this.notifyMessageHandlers(message);
+          } catch (error) {
+            console.error('WebSocket: Error parsing message:', error);
+            console.error('WebSocket: Raw message that failed to parse:', event.data);
           }
-          
-          // Handle authentication response
-          if (message.type === 'AUTH_SUCCESS') {
-            this.isAuthenticated = true;
-            console.log('WebSocket: Authentication successful!');
-            console.log('WebSocket: Auth success message:', JSON.stringify(message, null, 2));
-          } else if (message.type === 'AUTH_FAILURE') {
-            this.isAuthenticated = false;
-            console.error('WebSocket: Authentication failed:', message.reason);
-            console.error('WebSocket: Auth failure message:', JSON.stringify(message, null, 2));
-            this.disconnect();
-            this.notifyErrorHandlers(new Error(`Authentication failed: ${message.reason}`));
-            return;
-          }
-          
-          this.notifyMessageHandlers(message);
-        } catch (error) {
-          console.error('WebSocket: Error parsing message:', error);
-          console.error('WebSocket: Raw message that failed to parse:', event.data);
-        }
-      };
+        };
 
-      this.ws.onclose = (event) => {
-        clearTimeout(connectionTimeout);
-        console.log('WebSocket: Connection closed:', event.code, event.reason);
-        console.log('WebSocket: Close event details:', {
-          code: event.code,
-          reason: event.reason,
-          wasClean: event.wasClean
-        });
-        this.handleDisconnect();
-      };
+        this.ws.onclose = (event) => {
+          clearTimeout(connectionTimeout);
+          console.log('WebSocket: Connection closed:', event.code, event.reason);
+          console.log('WebSocket: Close event details:', {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean
+          });
+          this.handleDisconnect();
+        };
 
-      this.ws.onerror = (error) => {
-        clearTimeout(connectionTimeout);
-        console.error('WebSocket: Connection error:', error);
-        console.error('WebSocket: Error event details:', error);
+        this.ws.onerror = (error) => {
+          clearTimeout(connectionTimeout);
+          console.error('WebSocket: Connection error:', error);
+          console.error('WebSocket: Error event details:', error);
+          this.isConnecting = false;
+          this.notifyErrorHandlers(error);
+        };
+
+      } catch (error) {
+        console.error('WebSocket: Error during connection:', error);
         this.isConnecting = false;
-        this.notifyErrorHandlers(error);
-      };
-
-    } catch (error) {
-      console.error('WebSocket: Error during connection:', error);
-      this.isConnecting = false;
-      this.notifyErrorHandlers(error as Error);
-    }
+        this.notifyErrorHandlers(error as Error);
+      }
+    });
   }
 
   // Authenticate with server

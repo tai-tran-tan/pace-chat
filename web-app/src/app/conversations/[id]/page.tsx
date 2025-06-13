@@ -3,25 +3,38 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useMessageStore } from '@/store/useMessageStore';
 import apiService from '@/services/api';
 import socketService from '@/services/socket';
 import { Conversation, Message, User } from '@/types';
 import { cn } from '@/lib/utils';
 import { ArrowLeft } from 'lucide-react';
+import ChatHeader from '@/components/chat/ChatHeader';
+import ChatMessages from '@/components/chat/ChatMessages';
+import ChatInput from '@/components/chat/ChatInput';
 
 export default function ChatPage() {
   const router = useRouter();
   const params = useParams();
   const conversationId = params?.id as string;
   const { user } = useAuthStore();
+  const { 
+    getMessages, 
+    setMessages, 
+    addMessage, 
+    updateLastMessage 
+  } = useMessageStore();
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [activeTab, setActiveTab] = useState<'conversation' | 'files'>('conversation');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Get messages from message store
+  const messages = getMessages(conversationId);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -34,27 +47,31 @@ export default function ChatPage() {
     setError(null);
     try {
       // Get conversation detail
-      const convRes = await apiService.getConversationById(conversationId);
-      if (convRes.data && convRes.data.conversation_id) {
+        const convRes = await apiService.getConversationById(conversationId);
+      if (convRes.data && convRes.data) {
         setConversation(convRes.data);
       } else {
         throw new Error('Conversation not found');
       }
       // Get messages
-      const msgRes = await apiService.getMessages(conversationId);
-      if (msgRes.data && Array.isArray(msgRes.data)) {
-        setMessages(msgRes.data);
-      } else if (msgRes.data && Array.isArray(msgRes.data.data)) {
-        setMessages(msgRes.data.data);
+        const msgRes = await apiService.getMessages(conversationId);
+        console.log('msgRes', msgRes);
+      if (msgRes.data && Array.isArray(msgRes.data.messages)) {
+        setMessages(conversationId, msgRes.data.messages);
+        // Update last message if there are messages
+        if (msgRes.data.messages.length > 0) {
+          const lastMessage = msgRes.data.messages[msgRes.data.messages.length - 1];
+          updateLastMessage(conversationId, lastMessage);
+        }
       } else {
-        setMessages([]);
+        setMessages(conversationId, []);
       }
     } catch (err: any) {
       setError('Failed to load conversation. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [conversationId]);
+  }, [conversationId, setMessages, updateLastMessage]);
 
   useEffect(() => {
     if (conversationId) {
@@ -75,16 +92,19 @@ export default function ChatPage() {
     const unsubscribe = socketService.onMessage((wsMessage) => {
       if (wsMessage.type === 'MESSAGE_RECEIVED' && wsMessage.message.conversation_id === conversationId) {
         console.log('Received message:', wsMessage.message);
-        setMessages((prev) => {
-          // Nếu có temp message với cùng content và sender, loại bỏ temp trước khi thêm message thực
-          const filtered = prev.filter(
-            (m) =>
-              !m.message_id.startsWith('temp_') ||
-              m.content !== wsMessage.message.content ||
-              m.sender_id !== wsMessage.message.sender_id
-          );
-          return [...filtered, wsMessage.message];
-        });
+        
+        // Remove temp message if exists
+        const currentMessages = getMessages(conversationId);
+        const filtered = currentMessages.filter(
+          (m) =>
+            !m.message_id.startsWith('temp_') ||
+            m.content !== wsMessage.message.content ||
+            m.sender_id !== wsMessage.message.sender_id
+        );
+        
+        // Add new message to store
+        addMessage(conversationId, wsMessage.message);
+        updateLastMessage(conversationId, wsMessage.message);
       }
     });
     return () => {
@@ -92,12 +112,21 @@ export default function ChatPage() {
       unsubscribe();
       // Không disconnect ở đây, để giữ kết nối khi chuyển conversation
     };
-  }, [conversationId]);
+  }, [conversationId, addMessage, updateLastMessage, getMessages]);
 
   // Gửi tin nhắn qua WebSocket
   const handleSend = async () => {
     if (!input.trim() || !user || !conversationId) return;
     setIsSending(true);
+    // Đảm bảo WebSocket đã kết nối
+    if (!socketService.isConnected) {
+      await socketService.connect();
+      if (!socketService.isConnected) {
+        setIsSending(false);
+        alert('WebSocket not connected. Please try again.');
+        return;
+      }
+    }
     const tempMessage: Message = {
       message_id: `temp_${Date.now()}`,
       conversation_id: conversationId,
@@ -109,32 +138,24 @@ export default function ChatPage() {
       timestamp: new Date().toISOString(),
       read_by: [],
     };
-    setMessages((prev) => [...prev, tempMessage]);
+    
+    // Add temp message to store
+    addMessage(conversationId, tempMessage);
+    updateLastMessage(conversationId, tempMessage);
     setInput('');
+    
     try {
-      await socketService.connect(); // Đảm bảo đã connect
       await socketService.sendMessage(conversationId, input, 'text');
-      console.log('Message sent via WebSocket:', input);
       // Khi server gửi MESSAGE_RECEIVED sẽ tự động update UI
     } catch (err) {
-      setMessages((prev) => prev.filter((m) => m.message_id !== tempMessage.message_id));
+      // Remove temp message on error
+      const currentMessages = getMessages(conversationId);
+      const filtered = currentMessages.filter((m) => m.message_id !== tempMessage.message_id);
+      setMessages(conversationId, filtered);
       console.error('Failed to send message:', err);
     } finally {
       setIsSending(false);
     }
-  };
-
-  // Test WebSocket connection
-  const testWebSocket = () => {
-    console.log('Testing WebSocket connection...');
-    const token = localStorage.getItem('access_token');
-    console.log('Token:', token ? token.substring(0, 20) + '...' : 'No token');
-    
-    // Force reconnect
-    socketService.disconnect();
-    setTimeout(() => {
-      socketService.connect();
-    }, 1000);
   };
 
   if (isLoading) {
@@ -167,7 +188,7 @@ export default function ChatPage() {
   }
 
   // Get display name for conversation
-  const getConversationDisplayName = (conv: Conversation): string => {
+    const getConversationDisplayName = (conv: Conversation): string => {
     if (conv.type === 'private') {
       const other = conv.participants.find((p) => p.user_id !== user?.user_id);
       return other?.username || 'Unknown User';
@@ -175,88 +196,64 @@ export default function ChatPage() {
     return conv.name || 'Group Chat';
   };
 
+  // Get avatar for conversation
+  const getConversationAvatar = (conv: Conversation): string | undefined => {
+    if (conv.type === 'private') {
+      const other = conv.participants.find((p) => p.user_id !== user?.user_id);
+      return other?.avatar_url || undefined;
+    }
+    return undefined;
+  };
+
+  // Map messages to MessageBubble props
+  const mappedMessages = messages.map((msg) => ({
+    text: msg.content,
+    isOwn: msg.sender_id === user?.user_id,
+    time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    avatar: msg.sender_avatar || undefined,
+    // fileUrl, fileSize, audioUrl: có thể mở rộng nếu có
+  }));
+
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+    <>
       {/* Header */}
-      <div className="flex items-center px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        <button onClick={() => router.back()} className="mr-4 text-blue-600 hover:text-blue-800">{'< Back'}</button>
-        <div className="flex items-center">
-          <div className="h-10 w-10 rounded-full bg-blue-200 flex items-center justify-center mr-3">
-            {conversation.type === 'group' ? (
-              <span className="font-bold text-blue-700">G</span>
-            ) : (
-              <span className="font-bold text-blue-700">
-                {getConversationDisplayName(conversation).charAt(0).toUpperCase()}
-              </span>
-            )}
-          </div>
-          <div>
-            <div className="font-semibold text-gray-900 dark:text-white">
-              {getConversationDisplayName(conversation)}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {conversation.type === 'private' ? 'Private chat' : 'Group chat'}
-            </div>
+      <div className='border-b border-gray-200 dark:border-gray-700'>
+        <div className='flex items-center'>
+          <div className='flex-1'>
+            <ChatHeader
+              avatar={getConversationAvatar(conversation) || '/avatar-placeholder.png'}
+              name={getConversationDisplayName(conversation)}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
           </div>
         </div>
       </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
-        {messages.length === 0 ? (
-          <div className="text-center text-gray-400">No messages yet</div>
-        ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.message_id}
-              className={cn(
-                'flex flex-col',
-                msg.sender_id === user?.user_id ? 'items-end' : 'items-start'
-              )}
-            >
-              <div
-                className={cn(
-                  'rounded-lg px-4 py-2 max-w-xs break-words',
-                  msg.sender_id === user?.user_id
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
-                )}
-              >
-                {msg.content}
-              </div>
-              <div className="text-xs text-gray-400 mt-1">
-                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </div>
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSend();
-        }}
-        className="flex items-center px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-      >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type a message..."
-          className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 mr-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          disabled={isSending}
-        />
-        <button
-          type="submit"
-          disabled={isSending || !input.trim()}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md disabled:opacity-50"
-        >
-          Send
-        </button>
-      </form>
-    </div>
+      {/* Main content */}
+      {activeTab === 'conversation' ? (
+        <>
+          <div className='flex-1 flex flex-col overflow-y-auto'>
+            <ChatMessages messages={mappedMessages} />
+            <div ref={messagesEndRef} />
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className='border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+          >
+            <ChatInput
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onSend={handleSend}
+              disabled={isSending}
+            />
+          </form>
+        </>
+      ) : (
+        <div className='flex-1 flex items-center justify-center text-gray-400'>File sharing coming soon...</div>
+      )}
+    </>
   );
 } 
