@@ -8,7 +8,7 @@ services:
     image: "cassandra:5.0.4"
     container_name: "cassandra-db"
     ports:
-      - 7000:7000
+      - "7000:7000"
     networks:
       - cassandra-pace
     environment:
@@ -17,16 +17,18 @@ services:
       - cassandra-pace:/var/lib/cassandra:rw
     restart:
       on-failure
-    # healthcheck:
-    #   test: ["CMD-SHELL", "nodetool status"]
-    #   interval: 2m
-    #   start_period: 2m
-    #   timeout: 10s
-    #   retries: 3
+    healthcheck:
+      test: [ "CMD-SHELL", "nodetool status" ]
+      interval: 2m
+      start_period: 2m
+      timeout: 10s
+      retries: 3
   coordinator:
     image: stargateio/coordinator-4_0:v2
+    container_name: coordinator-sg
     depends_on:
-      - cassandra-db
+      cassandra-db:
+        condition: service_healthy
     networks:
       - cassandra-pace
     ports:
@@ -36,17 +38,24 @@ services:
       - "8090:8090"
     mem_limit: 2G
     environment:
-      - JAVA_OPTS="-Xmx2G"
+      - JAVA_OPTS=-Dstargate.auth_tokenttl=604800 -Xmx2G
       - CLUSTER_NAME=pace-cluster
-      # - CLUSTER_VERSION=4.0
+      - CLUSTER_VERSION=4.0
       # - RACK_NAME=rack1
       # - DATACENTER_NAME=datacenter1
       - ENABLE_AUTH=true
       - DEVELOPER_MODE=true
+    healthcheck:
+      test: curl -f http://localhost:8084/checker/readiness || exit 1
+      interval: 15s
+      timeout: 10s
+      retries: 10
   restapi:
     image: stargateio/restapi:v2
+    container_name: restapi-sg
     depends_on:
-      - coordinator
+      coordinator:
+        condition: service_healthy
     networks:
       - cassandra-pace
     ports:
@@ -55,35 +64,42 @@ services:
     environment:
       - QUARKUS_GRPC_CLIENTS_BRIDGE_HOST=coordinator
       - QUARKUS_GRPC_CLIENTS_BRIDGE_PORT=8091
-      - QUARKUS_HTTP_ACCESS_LOG_ENABLED=${REQUESTLOG}
-      - QUARKUS_LOG_LEVEL=${LOGLEVEL}
-  graphqlapi:
-    image: stargateio/graphqlapi:v2
-    depends_on:
-      - coordinator
-    networks:
-      - cassandra-pace
-    ports:
-      - "8080:8080"
-    mem_limit: 2G
-    environment:
-      - QUARKUS_GRPC_CLIENTS_BRIDGE_HOST=coordinator
-      - QUARKUS_GRPC_CLIENTS_BRIDGE_PORT=8091
-      - QUARKUS_HTTP_ACCESS_LOG_ENABLED=${REQUESTLOG}
-      - QUARKUS_LOG_LEVEL=${LOGLEVEL}
-  docsapi:
-    image: stargateio/docsapi:v2
-    depends_on:
-      - coordinator
-    networks:
-      - cassandra-pace
-    ports:
-      - "8180:8180"
-    mem_limit: 2G
-    environment:
-      - QUARKUS_GRPC_CLIENTS_BRIDGE_HOST=coordinator
-      - QUARKUS_GRPC_CLIENTS_BRIDGE_PORT=8091
-      - QUARKUS_HTTP_ACCESS_LOG_ENABLED=${REQUESTLOG}
-      - QUARKUS_LOG_LEVEL=${LOGLEVEL}
+      - QUARKUS_HTTP_ACCESS_LOG_ENABLED=false
+      - QUARKUS_LOG_LEVEL=INFO
+    healthcheck:
+      test: curl -f http://localhost:8082/stargate/health || exit 1
+      interval: 5s
+      timeout: 10s
+      retries: 10
+#  graphqlapi:
+#    image: stargateio/graphqlapi:v2
+#    container_name: graphql-sg
+#    depends_on:
+#      - coordinator
+#    networks:
+#      - cassandra-pace
+#    ports:
+#      - "8080:8080"
+#    mem_limit: 2G
+#    environment:
+#      - QUARKUS_GRPC_CLIENTS_BRIDGE_HOST=coordinator
+#      - QUARKUS_GRPC_CLIENTS_BRIDGE_PORT=8091
+#      - QUARKUS_HTTP_ACCESS_LOG_ENABLED=${REQUESTLOG}
+#      - QUARKUS_LOG_LEVEL=${LOGLEVEL}
+#  docsapi:
+#    image: stargateio/docsapi:v2
+#    container_name: docs-sg
+#    depends_on:
+#      - coordinator
+#    networks:
+#      - cassandra-pace
+#    ports:
+#      - "8180:8180"
+#    mem_limit: 2G
+#    environment:
+#      - QUARKUS_GRPC_CLIENTS_BRIDGE_HOST=coordinator
+#      - QUARKUS_GRPC_CLIENTS_BRIDGE_PORT=8091
+#      - QUARKUS_HTTP_ACCESS_LOG_ENABLED=${REQUESTLOG}
+#      - QUARKUS_LOG_LEVEL=${LOGLEVEL}
 volumes:
   cassandra-pace:
