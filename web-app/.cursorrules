@@ -1,0 +1,93 @@
+# Cursor Rules for Pace Chat Web App
+
+## 🎯 Project Context
+This is the web application for Pace Chat, built with Next.js 15, TypeScript, and Tailwind CSS. It provides the same features as the mobile app but optimized for web browsers.
+
+## 📁 Project Structure
+- `src/app/` - Next.js App Router pages and layouts
+- `src/components/` - Reusable React components
+- `src/lib/` - Utility functions and configurations
+- `src/hooks/` - Custom React hooks
+- `src/store/` - Zustand state management
+- `src/types/` - TypeScript type definitions
+- `src/services/` - API and WebSocket services
+- `src/styles/` - Global styles and Tailwind config
+
+## 🌐 Language Rules
+- **ALL CODE**: Always use English for code, comments, variable names, and technical terms
+- **UI Text**: Use English for all text displayed to users (labels, messages, etc.)
+- **Documentation**: English for all technical documentation
+- **Validation Messages**: English for all form validation messages
+- **Error Messages**: English for all error messages and notifications
+- **Comments**: English for all code comments and documentation
+
+## 🎨 UI/UX Rules
+- Material Design principles
+- Responsive design for desktop, tablet, and mobile
+- Dark/Light theme support with system preference detection
+- Consistent color scheme with mobile app
+- Accessibility considerations (ARIA labels, keyboard navigation)
+- Loading states and error handling
+- Smooth animations with Framer Motion
+
+## 📝 Code Style Rules
+- Use camelCase for variables and functions
+- PascalCase for components and classes
+- Kebab-case for file names
+- 2 spaces indentation
+- Semicolons required
+- Single quotes for strings
+- Trailing commas in objects and arrays
+- Prefer functional components with hooks
+- Use TypeScript strict mode
+
+## 🔒 Security Rules
+- Never commit API keys or secrets
+- Use environment variables for configuration
+- Validate all user inputs with Zod schemas
+- Sanitize data before rendering
+- Implement proper authentication with JWT
+- Use HTTPS in production
+
+## 🧪 Testing Rules
+- Write unit tests for utility functions
+- Component testing with React Testing Library
+- E2E testing with Playwright
+- Minimum 80% code coverage
+
+## 📚 Documentation Rules
+- JSDoc comments for functions and components
+- README files for each major component
+- API documentation with examples
+- Setup instructions for development
+
+## 🚀 Performance Rules
+- Use Next.js Image component for optimized images
+- Implement lazy loading for components
+- Memoization for expensive calculations
+- Debounce for search inputs
+- Pagination for large lists
+- Optimize bundle size with dynamic imports
+
+## 🔄 Git Rules
+- Conventional commits format
+- Feature branches from main
+- Pull request reviews required
+- No direct commits to main branch
+- Meaningful commit messages
+
+## 📦 Dependencies Rules
+- Pin exact versions in package.json
+- Regular security updates
+- Audit dependencies monthly
+- Minimal dependencies approach
+- Document why each dependency is needed
+
+## 🎯 Development Workflow
+- Use Next.js App Router for routing
+- Implement proper error boundaries
+- Use React Query for server state
+- Zustand for client state
+- Socket.IO for real-time communication
+- Tailwind CSS for styling
+- Headless UI for accessible components 
