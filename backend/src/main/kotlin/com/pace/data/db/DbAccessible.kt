@@ -6,9 +6,9 @@ import com.pace.data.model.User
 import kotlinx.datetime.Instant
 
 interface DbAccessible {
-    fun findUserByUsername(username: String): User?
-    fun markMessagesAsRead(conversationId: String, lastReadMessageId: String, readerId: String): List<Message>
-    fun addMessage(
+    suspend fun findUserByUsername(username: String): User?
+    suspend fun markMessagesAsRead(conversationId: String, lastReadMessageId: String, readerId: String): List<Message>
+    suspend fun addMessage(
         conversationId: String,
         senderId: String,
         content: String,
@@ -16,20 +16,20 @@ interface DbAccessible {
         clientMessageId: String?
     ): Message?
 
-    fun hasMoreMessages(conversationId: String, oldestMessageId: String?): Boolean
-    fun getMessagesForConversation(conversationId: String, limit: Int, beforeMessageId: String?): List<Message>
-    fun updateGroupParticipants(conversationId: String, addIds: List<String>?, removeIds: List<String>?): Conversation?
-    fun createGroupConversation(creatorId: String, name: String, participantIds: List<String>): Conversation
-    fun createPrivateConversation(user1Id: String, user2Id: String): Conversation
-    fun findPrivateConversation(user1Id: String, user2Id: String): Conversation?
-    fun findConversationById(conversationId: String): Conversation?
-    fun getConversationsForUser(userId: String): List<Conversation>
-    fun addDeviceToken(userId: String, deviceToken: String, platform: String)
-    fun updateUserStatus(userId: String, status: String, lastSeen: Instant?)
-    fun updateUserProfile(userId: String, username: String?, email: String?, avatarUrl: String?): User?
-    fun searchUsers(query: String): List<User>
-    fun findUserByEmail(email: String): User?
-    fun findUserById(userId: String): User?
-    fun authenticateUser(username: String, password: String): User?
-    fun registerUser(username: String, email: String, password: String): User
+    suspend fun hasMoreMessages(conversationId: String, oldestMessageId: String?): Boolean
+    suspend fun getMessagesForConversation(conversationId: String, limit: Int, beforeMessageId: String?): List<Message>
+    suspend fun updateGroupParticipants(conversationId: String, addIds: List<String>?, removeIds: List<String>?): Conversation?
+    suspend fun createGroupConversation(creatorId: String, name: String, participantIds: List<String>): Conversation
+    suspend fun createPrivateConversation(user1Id: String, user2Id: String): Conversation
+    suspend fun findPrivateConversation(user1Id: String, user2Id: String): Conversation?
+    suspend fun findConversationById(conversationId: String): Conversation?
+    suspend fun getConversationsForUser(userId: String): List<Conversation>
+    suspend fun addDeviceToken(userId: String, deviceToken: String, platform: String)
+    suspend fun updateUserStatus(userId: String, status: String, lastSeen: Instant?)
+    suspend fun updateUserProfile(userId: String, username: String?, email: String?, avatarUrl: String?): User?
+    suspend fun searchUsers(query: String): List<User>
+    suspend fun findUserByEmail(email: String): User?
+    suspend fun findUserById(userId: String): User?
+    suspend fun authenticateUser(username: String, password: String): User?
+    suspend fun registerUser(user: User): User
 }

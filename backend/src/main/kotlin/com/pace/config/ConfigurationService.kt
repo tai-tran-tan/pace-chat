@@ -19,6 +19,7 @@ object ConfigurationService {
 
         val fileStore = ConfigStoreOptions()
             .setType("file")
+            .setType("file")
             .setFormat("hocon")
             .setConfig(JsonObject().put("path", "application.conf"))
 

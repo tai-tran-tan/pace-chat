@@ -1,6 +1,6 @@
 package com.pace.router
 
-import com.pace.utility.OBJECT_MAPPER
+import com.pace.utility.deserialize
 import io.vertx.ext.web.Route
 import io.vertx.ext.web.RoutingContext
 import io.vertx.kotlin.coroutines.dispatcher
@@ -9,10 +9,10 @@ import kotlinx.coroutines.launch
 
 // Extension function to simplify getting body as a Kotlinx Serialization POJO
 inline fun <reified T : Any> RoutingContext.bodyAsPojo(): T =
-    // Vert.x uses Jackson for JSON by default with its `asPojo`
-    // Ensure kotlinx.serialization.json.Json.Default is registered with Jackson
-    // This setup uses DatabindCodec directly for serialization/deserialization.
-    OBJECT_MAPPER.readValue(this.body().asString(), T::class.java)
+// Vert.x uses Jackson for JSON by default with its `asPojo`
+// Ensure kotlinx.serialization.json.Json.Default is registered with Jackson
+// This setup uses DatabindCodec directly for serialization/deserialization.
+this.body().asJsonObject().deserialize()
 
 // Another extension for coroutine handling on Router, if needed, though MainVerticle directly defines it.
 // This is an alternative way to define if not using the Router.coroutineHandler extension directly
