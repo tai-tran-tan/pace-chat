@@ -1,0 +1,41 @@
+{
+  "folders": [
+    {
+      "name": "📱 Mobile App",
+      "path": "./mobile-app"
+    },
+    {
+      "name": "🔧 Backend",
+      "path": "./backend"
+    },
+    {
+      "name": "📚 Documentation",
+      "path": "./docs"
+    }
+  ],
+  "settings": {
+    "typescript.preferences.importModuleSpecifier": "relative",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": true
+    },
+    "files.associations": {
+      "*.kt": "kotlin",
+      "*.kts": "kotlin",
+      "*.tsx": "typescriptreact",
+      "*.ts": "typescript"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-vscode.vscode-typescript-next",
+      "bradlc.vscode-tailwindcss",
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-eslint",
+      "mathiasfrohlich.kotlin",
+      "fwcd.kotlin",
+      "ms-vscode.vscode-json",
+      "ms-vscode.vscode-yaml"
+    ]
+  }
+} 

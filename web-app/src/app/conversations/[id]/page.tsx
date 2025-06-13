@@ -4,11 +4,10 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMessageStore } from '@/store/useMessageStore';
+import { useConversationStore } from '@/store/useConversationStore';
 import apiService from '@/services/api';
 import socketService from '@/services/socket';
-import { Conversation, Message, User } from '@/types';
-import { cn } from '@/lib/utils';
-import { ArrowLeft } from 'lucide-react';
+import { Conversation, Message } from '@/types';
 import ChatHeader from '@/components/chat/ChatHeader';
 import ChatMessages from '@/components/chat/ChatMessages';
 import ChatInput from '@/components/chat/ChatInput';
@@ -24,6 +23,7 @@ export default function ChatPage() {
     addMessage, 
     updateLastMessage 
   } = useMessageStore();
+  const { resetConversationUnreadCount } = useConversationStore();
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,15 +31,24 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [activeTab, setActiveTab] = useState<'conversation' | 'files'>('conversation');
+  const [isClient, setIsClient] = useState(false);
+  const [isWsConnected, setIsWsConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // Get messages from message store
   const messages = getMessages(conversationId);
 
+  // Ensure we're on client side
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (isClient) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isClient]);
 
   // Fetch conversation detail and messages
   const fetchConversation = useCallback(async () => {
@@ -81,13 +90,17 @@ export default function ChatPage() {
 
   // WebSocket: connect once and keep connection when switching between conversations
   useEffect(() => {
+    if (!isClient) return;
+    
     let isMounted = true;
     (async () => {
       if (isMounted) {
         await socketService.connect();
         console.log('WebSocket connected (conversation detail)');
+        setIsWsConnected(true);
       }
     })();
+    
     // Lắng nghe tin nhắn mới
     const unsubscribe = socketService.onMessage((wsMessage) => {
       if (wsMessage.type === 'MESSAGE_RECEIVED' && wsMessage.message.conversation_id === conversationId) {
@@ -105,30 +118,80 @@ export default function ChatPage() {
         // Add new message to store
         addMessage(conversationId, wsMessage.message);
         updateLastMessage(conversationId, wsMessage.message);
+        
+        // Mark message as read immediately when received
+        socketService.sendReadReceipt(conversationId, wsMessage.message.message_id);
       }
     });
+
+    // Listen for connection status changes
+    const onConnect = () => {
+      if (isMounted) {
+        setIsWsConnected(true);
+      }
+    };
+
+    const onDisconnect = () => {
+      if (isMounted) {
+        setIsWsConnected(false);
+      }
+    };
+
+    socketService.onConnect(onConnect);
+    socketService.onError(() => {
+      if (isMounted) {
+        setIsWsConnected(false);
+      }
+    });
+    
     return () => {
       isMounted = false;
       unsubscribe();
       // Không disconnect ở đây, để giữ kết nối khi chuyển conversation
     };
-  }, [conversationId, addMessage, updateLastMessage, getMessages]);
+  }, [conversationId, addMessage, updateLastMessage, getMessages, isClient]);
+
+  // Send read receipt when entering chat page
+  useEffect(() => {
+    if (!isClient) return;
+    
+    if (conversationId && messages.length > 0 && isWsConnected) {
+      // Get the latest message ID and send read receipt
+      const latestMessage = messages[messages.length - 1];
+      if (latestMessage && latestMessage.sender_id !== user?.user_id) {
+        socketService.sendReadReceipt(conversationId, latestMessage.message_id);
+        console.log('Sent read receipt for latest message:', latestMessage.message_id);
+      }
+    }
+  }, [conversationId, messages, user?.user_id, isWsConnected, isClient]);
+
+  // Reset unread count when entering chat page
+  useEffect(() => {
+    if (!isClient) return;
+    
+    if (conversationId) {
+      // Reset unread count for this conversation when user visits the chat
+      resetConversationUnreadCount(conversationId);
+      console.log('Reset unread count for conversation:', conversationId);
+    }
+  }, [conversationId, resetConversationUnreadCount, isClient]);
 
   // Gửi tin nhắn qua WebSocket
   const handleSend = async () => {
-    if (!input.trim() || !user || !conversationId) return;
+    if (!input.trim() || !user || !conversationId || !isClient) return;
     setIsSending(true);
     // Đảm bảo WebSocket đã kết nối
-    if (!socketService.isConnected) {
+    if (!isWsConnected) {
       await socketService.connect();
       if (!socketService.isConnected) {
         setIsSending(false);
         alert('WebSocket not connected. Please try again.');
         return;
       }
+      setIsWsConnected(true);
     }
     const tempMessage: Message = {
-      message_id: `temp_${Date.now()}`,
+      message_id: `temp_${conversationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       conversation_id: conversationId,
       sender_id: user.user_id,
       sender_name: user.username,
@@ -209,7 +272,7 @@ export default function ChatPage() {
   const mappedMessages = messages.map((msg) => ({
     text: msg.content,
     isOwn: msg.sender_id === user?.user_id,
-    time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    time: isClient ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
     avatar: msg.sender_avatar || undefined,
     // fileUrl, fileSize, audioUrl: có thể mở rộng nếu có
   }));

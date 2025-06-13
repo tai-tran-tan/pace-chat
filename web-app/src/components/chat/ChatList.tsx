@@ -19,7 +19,7 @@ interface ChatListProps {
 const ChatList: React.FC<ChatListProps> = ({ items, onItemClick }) => {
   return (
     <div className='overflow-y-auto h-full'>
-      {items.map((item, idx) => (
+      {items.map((item) => (
         <ChatListItem key={item.conversationId} {...item} onClick={() => onItemClick?.(item.conversationId)} />
       ))}
     </div>

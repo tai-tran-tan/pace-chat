@@ -332,24 +332,6 @@ const ChatScreen = () => {
 
   // Handle image sending
   const handleSendImage = async () => {
-    setImageActionSheetVisible(true);
-  };
-
-  const handleImageFromCamera = async () => {
-    setImageActionSheetVisible(false);
-    try {
-      const imageUri = await FileUploadService.takePhoto();
-      if (imageUri) {
-        await uploadAndSendImage(imageUri);
-      }
-    } catch (error) {
-      console.error('Failed to take photo:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
-    }
-  };
-
-  const handleImageFromGallery = async () => {
-    setImageActionSheetVisible(false);
     try {
       const imageUri = await FileUploadService.pickImage();
       if (imageUri) {
@@ -420,6 +402,21 @@ const ChatScreen = () => {
   const handleImagePress = (imageUrl: string) => {
     setSelectedImageUrl(imageUrl);
     setImageViewerVisible(true);
+  };
+
+  const handleFilePress = (fileUrl: string) => {
+    // For now, just show an alert. In a real app, you might want to:
+    // 1. Download the file
+    // 2. Open it with a compatible app
+    // 3. Show file details
+    Alert.alert(
+      'File',
+      `File URL: ${fileUrl}`,
+      [
+        { text: 'Copy URL', onPress: () => console.log('Copy URL') },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
   };
 
   const handleCloseImageViewer = () => {
@@ -493,6 +490,7 @@ const ChatScreen = () => {
             keyExtractor={item => item.message_id}
             renderItem={({ item }) => (
               <MessageBubble
+                key={item.message_id}
                 text={item.content}
                 isMine={item.sender_id === user?.user_id}
                 timestamp={new Date(item.timestamp).toLocaleTimeString([], { 
@@ -502,7 +500,8 @@ const ChatScreen = () => {
                 isRead={item?.read_by?.length > 0}
                 messageType={item.message_type}
                 onImagePress={() => item.message_type === 'image' ? handleImagePress(item.content) : undefined}
-                isUploading={item.message_id.startsWith('temp_img_')}
+                onFilePress={() => handleFilePress(item.content)}
+                isUploading={item.message_id.startsWith('temp_')}
               />
             )}
             contentContainerStyle={[
@@ -544,8 +543,8 @@ const ChatScreen = () => {
       <ImageActionSheet
         visible={imageActionSheetVisible}
         onClose={() => setImageActionSheetVisible(false)}
-        onCamera={handleImageFromCamera}
-        onGallery={handleImageFromGallery}
+        onCamera={() => {}}
+        onGallery={handleSendImage}
       />
     </View>
   );

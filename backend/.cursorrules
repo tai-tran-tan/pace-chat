@@ -1,0 +1,94 @@
+# Kotlin + Vert.x Backend Project Rules
+
+## 🎯 Project Type
+Kotlin backend API with Vert.x framework for reactive programming
+
+## 🔧 Technology Stack
+- Kotlin programming language
+- Vert.x framework for reactive programming
+- Gradle for build management
+- JWT authentication with Auth0 java-jwt
+- WebSocket for real-time communication
+- In-memory database for development
+- Jackson for JSON serialization
+- Kotlinx Serialization for JSON handling
+- KLogging for logging
+
+## 📝 Code Style
+- Kotlin idiomatic code
+- Functional programming patterns
+- Reactive programming with Vert.x
+- Coroutines for async operations
+- Extension functions for utility methods
+- Data classes for models
+- Sealed classes for error handling
+- ALWAYS use English for code, comments, and variable names
+
+## 🏗️ Architecture Rules
+- Verticle-based architecture
+- Router pattern for API endpoints
+- Service layer for business logic
+- Repository pattern for data access
+- Middleware for cross-cutting concerns
+- Event-driven architecture
+
+## 🔒 Security Rules
+- JWT token validation with Auth0
+- CORS configuration
+- Input validation
+- Rate limiting (if needed)
+- Secure headers
+- Authentication middleware
+
+## 📊 Database Rules
+- In-memory database for development
+- Data models with data classes
+- Proper serialization/deserialization
+- Connection management (for future persistent DB)
+
+## 🧪 Testing Rules
+- JUnit 5 for unit tests
+- Vert.x Test for integration tests
+- Mock external services
+- Test coverage reporting
+- Reactive testing patterns
+
+## 📚 API Documentation
+- OpenAPI/Swagger specification
+- KDoc comments for functions
+- Example requests/responses
+- Error code documentation
+- Authentication examples
+
+## 🚀 Performance Rules
+- Reactive programming patterns
+- Non-blocking I/O
+- Efficient JSON handling
+- Memory management
+- Monitoring and logging
+
+## 🔄 Git Rules
+- Conventional commits
+- Branch naming: feature/, bugfix/, hotfix/
+- Pull request templates
+- Code review checklist
+- Automated testing on CI/CD
+
+## 📦 Dependencies Rules
+- Gradle dependency management
+- Version pinning in build.gradle.kts
+- Regular security updates
+- Minimal dependencies approach
+- Document why each dependency is needed
+
+## 🎯 Development Rules
+- IntelliJ IDEA for development
+- Gradle wrapper for builds
+- Hot reload with vertxRun
+- Debug configuration setup
+- Logging with KLogging
+
+## 🌐 Language Rules
+- **Code**: Always use English for code, comments, variable names
+- **Documentation**: English for all technical documentation
+- **API Responses**: English for error messages and technical responses 

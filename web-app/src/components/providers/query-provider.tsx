@@ -31,7 +31,7 @@ export function QueryProvider({ children }: QueryProviderProps) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-        <ReactQueryDevtools initialIsOpen={false} position='top' buttonPosition='top-right' />
+        {/* <ReactQueryDevtools initialIsOpen={false} position='top' buttonPosition='top-right' /> */}
     </QueryClientProvider>
   );
 } 

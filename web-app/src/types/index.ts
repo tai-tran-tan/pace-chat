@@ -83,7 +83,7 @@ export interface WsTypingIndicator extends WsMessage {
 export interface WsReadReceipt extends WsMessage {
   type: 'READ_RECEIPT';
   conversation_id: string;
-  message_id: string;
+  last_read_message_id: string;
 }
 
 export interface WsMessageReceived extends WsMessage {

@@ -13,6 +13,8 @@ interface ConversationActions {
   fetchConversations: (isRefresh?: boolean) => Promise<void>;
   setConversations: (convs: Conversation[]) => void;
   updateConversationLastMessage: (conversationId: string, lastMessage: any) => void;
+  updateConversationUnreadCount: (conversationId: string, unreadCount: number) => void;
+  resetConversationUnreadCount: (conversationId: string) => void;
   clearError: () => void;
 }
 
@@ -63,6 +65,32 @@ export const useConversationStore = create<ConversationState & ConversationActio
           ? {
               ...conv,
               last_message: lastMessage,
+            }
+          : conv
+      ),
+    }));
+  },
+
+  updateConversationUnreadCount: (conversationId, unreadCount) => {
+    set((state) => ({
+      conversations: state.conversations.map((conv) =>
+        conv.conversation_id === conversationId
+          ? {
+              ...conv,
+              unread_count: unreadCount,
+            }
+          : conv
+      ),
+    }));
+  },
+
+  resetConversationUnreadCount: (conversationId) => {
+    set((state) => ({
+      conversations: state.conversations.map((conv) =>
+        conv.conversation_id === conversationId
+          ? {
+              ...conv,
+              unread_count: 0,
             }
           : conv
       ),

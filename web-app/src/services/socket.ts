@@ -419,7 +419,7 @@ class WebSocketService {
     const message: WsReadReceipt = {
       type: 'READ_RECEIPT',
       conversation_id: conversationId,
-      message_id: messageId,
+      last_read_message_id: messageId,
     };
     this.send(message);
   }

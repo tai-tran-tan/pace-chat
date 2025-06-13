@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Text, IconButton } from 'react-native-paper';
 import LoadingIndicator from './LoadingIndicator';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   isRead: boolean;
   messageType?: 'text' | 'image' | 'video' | 'file';
   onImagePress?: () => void;
+  onFilePress?: () => void;
   isUploading?: boolean;
 }
 
@@ -24,14 +25,41 @@ const MessageBubble: React.FC<Props> = ({
   isRead, 
   messageType = 'text',
   onImagePress,
+  onFilePress,
   isUploading = false
 }) => {
   const isImage = messageType === 'image';
-  const isUploadingImage = isImage && isUploading;
+  const isFile = messageType === 'file';
+  const isUploadingContent = (isImage || isFile) && isUploading;
+
+  const getFileIcon = (fileName: string) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return 'file-pdf-box';
+      case 'doc':
+      case 'docx':
+        return 'file-word-box';
+      case 'xls':
+      case 'xlsx':
+        return 'file-excel-box';
+      case 'ppt':
+      case 'pptx':
+        return 'file-powerpoint-box';
+      case 'txt':
+        return 'file-document';
+      default:
+        return 'file';
+    }
+  };
+
+  const getFileName = (url: string) => {
+    return url.split('/').pop() || 'Unknown file';
+  };
 
   const renderContent = () => {
     if (isImage) {
-      if (isUploadingImage) {
+      if (isUploadingContent) {
         return <LoadingIndicator message="Đang tải lên hình ảnh..." />;
       }
       
@@ -42,6 +70,30 @@ const MessageBubble: React.FC<Props> = ({
             style={styles.image}
             resizeMode="cover"
           />
+        </TouchableOpacity>
+      );
+    }
+
+    if (isFile) {
+      if (isUploadingContent) {
+        return <LoadingIndicator message="Đang tải lên file..." />;
+      }
+
+      const fileName = getFileName(text);
+      const fileIcon = getFileIcon(fileName);
+
+      return (
+        <TouchableOpacity onPress={onFilePress} activeOpacity={0.7} style={styles.fileContainer}>
+          <IconButton icon={fileIcon} size={32} style={styles.fileIcon} />
+          <View style={styles.fileInfo}>
+            <Text style={styles.fileName} numberOfLines={2}>
+              {fileName}
+            </Text>
+            <Text style={styles.fileType}>
+              {fileName.split('.').pop()?.toUpperCase() || 'FILE'}
+            </Text>
+          </View>
+          <IconButton icon="download" size={20} style={styles.downloadIcon} />
         </TouchableOpacity>
       );
     }
@@ -64,13 +116,13 @@ const MessageBubble: React.FC<Props> = ({
       <View style={[
         styles.bubble,
         isMine ? styles.mineBubble : styles.otherBubble,
-        isImage && styles.imageBubble
+        (isImage || isFile) && styles.mediaBubble
       ]}>
         {renderContent()}
       </View>
       <View style={styles.footer}>
         <Text style={styles.timestamp}>{timestamp}</Text>
-        {isMine && !isUploadingImage && (
+        {isMine && !isUploadingContent && (
           <Text style={styles.readStatus}>
             {isRead ? '✓✓' : '✓'}
           </Text>
@@ -83,60 +135,89 @@ const MessageBubble: React.FC<Props> = ({
 const styles = StyleSheet.create({
   container: {
     marginVertical: 4,
-    maxWidth: '80%',
+    marginHorizontal: 8,
   },
   mineContainer: {
-    alignSelf: 'flex-end',
+    alignItems: 'flex-end',
   },
   otherContainer: {
-    alignSelf: 'flex-start',
+    alignItems: 'flex-start',
   },
   bubble: {
+    maxWidth: '80%',
     padding: 12,
-    borderRadius: 16,
-    maxWidth: '100%',
+    borderRadius: 18,
   },
   mineBubble: {
-    backgroundColor: '#0084ff',
+    backgroundColor: '#007AFF',
     borderBottomRightRadius: 4,
   },
   otherBubble: {
-    backgroundColor: '#e9e9eb',
+    backgroundColor: '#E5E5EA',
     borderBottomLeftRadius: 4,
+  },
+  mediaBubble: {
+    padding: 8,
   },
   imageBubble: {
     padding: 4,
-    backgroundColor: 'transparent',
   },
   text: {
     fontSize: 16,
     lineHeight: 20,
   },
   mineText: {
-    color: '#ffffff',
+    color: '#fff',
   },
   otherText: {
-    color: '#000000',
+    color: '#000',
   },
   image: {
     width: maxImageWidth,
     height: maxImageHeight,
     borderRadius: 12,
-    backgroundColor: '#f0f0f0',
+  },
+  fileContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 12,
+    padding: 12,
+    minWidth: 200,
+  },
+  fileIcon: {
+    margin: 0,
+  },
+  fileInfo: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  fileName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginBottom: 2,
+  },
+  fileType: {
+    fontSize: 12,
+    color: '#666',
+  },
+  downloadIcon: {
+    margin: 0,
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 4,
     marginHorizontal: 4,
   },
   timestamp: {
     fontSize: 12,
-    color: '#8e8e93',
+    color: '#999',
   },
   readStatus: {
     fontSize: 12,
-    color: '#0084ff',
+    color: '#007AFF',
     marginLeft: 4,
   },
 });

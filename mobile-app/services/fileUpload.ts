@@ -1,6 +1,6 @@
 import api from './api';
 import { Platform } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import DocumentPicker from 'react-native-document-picker';
 
 export interface FileUploadResponse {
   file_url: string;
@@ -10,62 +10,87 @@ export interface FileUploadResponse {
 
 export class FileUploadService {
   /**
-   * Pick an image from camera or gallery
+   * Pick an image using native file chooser
    */
   static async pickImage(): Promise<string | null> {
-    console.log('Opening image picker...');
+    console.log('Opening native file chooser...');
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      console.log('Media library permission status:', status);
-      if (status !== 'granted') {
-        throw new Error('Permission to access camera roll is required!');
-      }
-
-      console.log('About to launch image picker...');
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+      const result = await DocumentPicker.pick({
+        type: [DocumentPicker.types.images],
+        copyTo: 'cachesDirectory', // Copy file to app cache for better performance
       });
-      console.log('Image picker result:', result);
 
-      if (!result.canceled && result.assets[0]) {
-        return result.assets[0].uri;
+      console.log('File picker result:', result);
+
+      if (result && result.length > 0) {
+        const file = result[0];
+        return file.fileCopyUri || file.uri;
       }
       
       return null;
     } catch (error) {
-      console.error('Error picking image (outer catch):', error);
+      if (DocumentPicker.isCancel(error)) {
+        console.log('User cancelled file picker');
+        return null;
+      }
+      console.error('Error picking image:', error);
       throw error;
     }
   }
 
   /**
-   * Take a photo using camera
+   * Pick multiple images using native file chooser
    */
-  static async takePhoto(): Promise<string | null> {
+  static async pickMultipleImages(): Promise<string[]> {
+    console.log('Opening native file chooser for multiple images...');
     try {
-      // Request permissions
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        throw new Error('Permission to access camera is required!');
-      }
-
-      // Launch camera
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+      const result = await DocumentPicker.pickMultiple({
+        type: [DocumentPicker.types.images],
+        copyTo: 'cachesDirectory',
       });
 
-      if (!result.canceled && result.assets[0]) {
-        return result.assets[0].uri;
+      console.log('Multiple file picker result:', result);
+
+      if (result && result.length > 0) {
+        return result.map(file => file.fileCopyUri || file.uri).filter(Boolean);
+      }
+      
+      return [];
+    } catch (error) {
+      if (DocumentPicker.isCancel(error)) {
+        console.log('User cancelled multiple file picker');
+        return [];
+      }
+      console.error('Error picking multiple images:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Pick any file type using native file chooser
+   */
+  static async pickFile(): Promise<string | null> {
+    console.log('Opening native file chooser for any file...');
+    try {
+      const result = await DocumentPicker.pick({
+        type: [DocumentPicker.types.allFiles],
+        copyTo: 'cachesDirectory',
+      });
+
+      console.log('File picker result:', result);
+
+      if (result && result.length > 0) {
+        const file = result[0];
+        return file.fileCopyUri || file.uri;
       }
       
       return null;
     } catch (error) {
-      console.error('Error taking photo:', error);
+      if (DocumentPicker.isCancel(error)) {
+        console.log('User cancelled file picker');
+        return null;
+      }
+      console.error('Error picking file:', error);
       throw error;
     }
   }
@@ -101,7 +126,7 @@ export class FileUploadService {
       return response.data;
     } catch (error) {
       console.error('File upload failed:', error);
-      throw new Error('Failed to upload image. Please try again.');
+      throw new Error('Failed to upload file. Please try again.');
     }
   }
 
@@ -120,21 +145,31 @@ export class FileUploadService {
       mimeType = 'image/gif';
     } else if (extension === 'webp') {
       mimeType = 'image/webp';
+    } else if (extension === 'pdf') {
+      mimeType = 'application/pdf';
+    } else if (extension === 'doc') {
+      mimeType = 'application/msword';
+    } else if (extension === 'docx') {
+      mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    } else if (extension === 'txt') {
+      mimeType = 'text/plain';
     }
 
     // Generate unique filename
-    const fileName = `image_${Date.now()}.${extension || 'jpg'}`;
+    const fileName = `file_${Date.now()}.${extension || 'jpg'}`;
 
     return { mimeType, fileName };
   }
 
   /**
-   * Show image picker options (camera or gallery)
+   * Show file picker options (images only or all files)
    */
-  static async showImagePickerOptions(): Promise<string | null> {
-    // For now, we'll just use gallery picker
-    // In a real app, you might want to show an action sheet with options
-    return this.pickImage();
+  static async showFilePickerOptions(imageOnly: boolean = true): Promise<string | null> {
+    if (imageOnly) {
+      return this.pickImage();
+    } else {
+      return this.pickFile();
+    }
   }
 }
 

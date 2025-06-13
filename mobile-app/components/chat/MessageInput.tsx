@@ -72,7 +72,7 @@ const MessageInput: React.FC<Props> = ({
 
   return (
     <View style={[styles.container, style]}>
-      <IconButton icon="emoticon-outline" size={22} onPress={onEmoji} style={styles.icon} />
+      {/* <IconButton icon="emoticon-outline" size={22} onPress={onEmoji} style={styles.icon} /> */}
       <TextInput
         value={text}
         onChangeText={handleTextChange}
@@ -85,8 +85,7 @@ const MessageInput: React.FC<Props> = ({
         maxLength={1000}
         disabled={disabled}
       />
-      <IconButton icon="paperclip" size={22} onPress={onAttach} style={styles.icon} />
-      <IconButton icon="microphone" size={22} onPress={onRecord} style={styles.icon} />
+      {/* <IconButton icon="microphone" size={22} onPress={onRecord} style={styles.icon} /> */}
       <IconButton 
         icon="image-outline" 
         size={22} 
@@ -109,31 +108,24 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f7f7f7',
-    borderRadius: 0,
-    margin: 0,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   input: {
     flex: 1,
-    backgroundColor: 'transparent',
-    fontSize: 16,
+    maxHeight: 65,
     marginHorizontal: 4,
-    minHeight: 36,
-    maxHeight: 80,
-    borderRadius: 8,
-    paddingVertical: 4,
+    fontSize: 14,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+    // paddingHorizontal: 16,
+    // paddingVertical: 8,
   },
   icon: {
-    marginHorizontal: 2,
+    margin: 2,
   },
 });
 

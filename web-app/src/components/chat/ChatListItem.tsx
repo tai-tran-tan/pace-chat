@@ -20,6 +20,7 @@ const ChatListItem: React.FC<ChatListItemProps> = ({
   selected = false,
   onClick,
 }) => {
+    console.log('time', time);
   const [displayTime, setDisplayTime] = useState('');
 
   useEffect(() => {
@@ -43,7 +44,7 @@ const ChatListItem: React.FC<ChatListItemProps> = ({
       <div className='flex-1 ml-3 min-w-0'>
         <div className='flex justify-between items-center'>
           <span className='font-semibold text-sm truncate'>{name}</span>
-          <span className='text-xs text-gray-400'>{displayTime}</span>
+          {/* <span className='text-xs text-gray-400'>{displayTime}</span> */}
         </div>
         <div className='flex justify-between items-center mt-1'>
           <span className='text-xs text-gray-500 truncate'>{lastMessage}</span>

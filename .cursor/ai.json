@@ -1,0 +1,25 @@
+{
+  "ai": {
+    "model": "claude-3.5-sonnet",
+    "temperature": 0.7,
+    "maxTokens": 4000,
+    "contextLength": 100000,
+    "preferences": {
+      "language": "ALWAYS use English for all code, comments, and technical terms",
+      "codeStyle": "Follow project .cursorrules files",
+      "documentation": "Always include JSDoc/KDoc comments in English",
+      "testing": "Suggest unit tests for new features",
+      "security": "Highlight security considerations",
+      "performance": "Consider performance implications"
+    },
+    "autoComplete": {
+      "enabled": true,
+      "triggerCharacters": [".", "(", " ", ":"],
+      "snippets": true
+    },
+    "chat": {
+      "defaultSystemPrompt": "You are a helpful AI assistant for the Pace Chat project. Follow the .cursorrules files in each directory. ALWAYS use English for all code, comments, variable names, and technical documentation. Only use Vietnamese for UI text displayed to users.",
+      "contextWindow": 50000
+    }
+  }
+} 

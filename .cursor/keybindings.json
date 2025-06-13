@@ -1,0 +1,37 @@
+[
+  {
+    "key": "cmd+shift+r",
+    "command": "cursor.chat.focus",
+    "when": "!cursor.chat.focused"
+  },
+  {
+    "key": "cmd+shift+c",
+    "command": "cursor.chat.clear",
+    "when": "cursor.chat.focused"
+  },
+  {
+    "key": "cmd+shift+t",
+    "command": "cursor.chat.toggle",
+    "when": "!cursor.chat.focused"
+  },
+  {
+    "key": "cmd+shift+a",
+    "command": "cursor.chat.addToChat",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "cmd+shift+e",
+    "command": "cursor.chat.explain",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "cmd+shift+d",
+    "command": "cursor.chat.debug",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "cmd+shift+o",
+    "command": "cursor.chat.optimize",
+    "when": "editorTextFocus"
+  }
+] 
