@@ -3,7 +3,7 @@ package com.pace.data.db
 import com.pace.data.model.Conversation
 import com.pace.data.model.Message
 import com.pace.data.model.User
-import kotlinx.datetime.Instant
+import java.time.Instant
 
 interface DbAccessible {
     suspend fun findUserByUsername(username: String): User?

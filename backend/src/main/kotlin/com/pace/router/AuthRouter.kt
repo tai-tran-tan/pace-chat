@@ -2,7 +2,13 @@
 package com.pace.router
 
 import com.pace.data.db.DbAccessible
-import com.pace.data.model.*
+import com.pace.data.model.AuthLoginRequest
+import com.pace.data.model.AuthLoginResponse
+import com.pace.data.model.AuthRegisterRequest
+import com.pace.data.model.AuthRegisterResponse
+import com.pace.data.model.RefreshTokenRequest
+import com.pace.data.model.RefreshTokenResponse
+import com.pace.data.model.User
 import com.pace.security.JwtService
 import com.pace.utility.toJsonString
 import io.klogging.java.LoggerFactory
@@ -63,7 +69,7 @@ class AuthRouter(private val router: Router, private val jwtService: JwtService,
         }
 
         router.post("/v1/auth/refresh-token").handler(BodyHandler.create()).coroutineHandler { rc ->
-            val request = rc.body().asPojo(RefreshTokenRequest::class.java)
+            val request = rc.bodyAsPojo<RefreshTokenRequest>()
             try {
                 val decoded = jwtService.verifyRefreshToken(request.refreshToken)
                 val newAccessToken = jwtService.generateToken(decoded.userId, decoded.username)

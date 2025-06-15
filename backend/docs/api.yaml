@@ -8,9 +8,9 @@ info:
     and **WebSockets (WSS)** for real-time communication such as sending/receiving messages, typing indicators, and presence updates.
 
 servers:
-  - url: https://api.yourchatapp.com/v1
+  - url: http://localhost:8080/v1
     description: Main HTTP API server
-  - url: wss://api.yourchatapp.com/ws/chat
+  - url: http://localhost:8080/ws/chat
     description: |
       WebSocket server for real-time chat messages and presence.
 

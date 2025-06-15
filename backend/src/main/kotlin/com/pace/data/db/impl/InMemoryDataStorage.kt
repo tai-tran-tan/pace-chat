@@ -6,8 +6,7 @@ import com.pace.data.model.Message
 import com.pace.data.model.User
 import com.pace.data.storage.DataSource
 import io.klogging.java.LoggerFactory
-import kotlinx.datetime.Instant
-import kotlinx.datetime.toJavaInstant
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -43,7 +42,7 @@ internal class InMemoryDataStorage : DataSource {
             "alice@example.com",
             "password123",
             "online",
-            emptyList(),
+            mutableListOf(),
             "https://placehold.co/50x50/ff0000/ffffff?text=A",
             null
         )
@@ -53,9 +52,9 @@ internal class InMemoryDataStorage : DataSource {
             "bob@example.com",
             "password123",
             "offline",
-            emptyList(),
+            mutableListOf(),
             "https://placehold.co/50x50/00ff00/ffffff?text=B",
-            Instant.Companion.parse("2025-06-06T14:00:00Z")
+            Instant.parse("2025-06-06T14:00:00Z")
         )
         val charlie = User(
             charlieId,
@@ -63,7 +62,7 @@ internal class InMemoryDataStorage : DataSource {
             "charlie@example.com",
             "password123",
             "online",
-            emptyList(),
+            mutableListOf(),
             "https://placehold.co/50x50/0000ff/ffffff?text=C",
             null
         )
@@ -81,9 +80,9 @@ internal class InMemoryDataStorage : DataSource {
             privateConvId,
             "private",
             null,
-            listOf(alicePublic, bobPublic),
+            mutableListOf(bobId, aliceId),
             "Hey Bob!",
-            Instant.Companion.parse("2025-06-06T13:00:00Z"),
+            Instant.parse("2025-06-06T13:00:00Z"),
             0
         )
         conversations[privateConvId] = privateConv
@@ -93,9 +92,9 @@ internal class InMemoryDataStorage : DataSource {
             groupConvId,
             "group",
             "Dev Team",
-            listOf(alicePublic, bobPublic, charliePublic),
+            mutableListOf(aliceId, bobId, charlieId),
             "Daily standup at 9 AM.",
-            Instant.Companion.parse("2025-06-05T09:00:00Z"),
+            Instant.parse("2025-06-05T09:00:00Z"),
             1
         )
         conversations[groupConvId] = groupConv
@@ -107,7 +106,7 @@ internal class InMemoryDataStorage : DataSource {
                 aliceId,
                 "Hi Bob!",
                 "text",
-                Instant.Companion.parse("2025-06-06T12:58:00Z"),
+                Instant.parse("2025-06-06T12:58:00Z"),
                 mutableListOf(bobId)
             )
         )
@@ -118,7 +117,7 @@ internal class InMemoryDataStorage : DataSource {
                 bobId,
                 "Hey Alice!",
                 "text",
-                Instant.Companion.parse("2025-06-06T13:00:00Z"),
+                Instant.parse("2025-06-06T13:00:00Z"),
                 mutableListOf()
             )
         )
@@ -129,7 +128,7 @@ internal class InMemoryDataStorage : DataSource {
                 aliceId,
                 "Good morning team!",
                 "text",
-                Instant.Companion.parse("2025-06-05T08:55:00Z"),
+                Instant.parse("2025-06-05T08:55:00Z"),
                 mutableListOf(bobId)
             )
         )
@@ -140,7 +139,7 @@ internal class InMemoryDataStorage : DataSource {
                 charlieId,
                 "Daily standup at 9 AM.",
                 "text",
-                Instant.Companion.parse("2025-06-05T09:00:00Z"),
+                Instant.parse("2025-06-05T09:00:00Z"),
                 mutableListOf()
             )
         )
@@ -186,8 +185,8 @@ internal class InMemoryDataStorage : DataSource {
     // --- Conversation Operations ---
     override suspend fun getConversationsForUser(userId: String): List<Conversation> {
         return conversations.values
-            .filter { conv -> conv.participants.any { it.userId == userId } }
-            .sortedByDescending { it.lastMessageTimestamp?.toJavaInstant() ?: java.time.Instant.MIN }
+            .filter { conv -> conv.participants.any { it == userId } }
+            .sortedByDescending { it.lastMessageTimestamp ?: java.time.Instant.MIN }
     }
 
     override suspend fun findConversationById(conversationId: String): Conversation? {
@@ -198,8 +197,8 @@ internal class InMemoryDataStorage : DataSource {
         return conversations.values.find { conv ->
             conv.type == "private" &&
                     conv.participants.size == 2 &&
-                    conv.participants.any { it.userId == user1Id } &&
-                    conv.participants.any { it.userId == user2Id }
+                    conv.participants.any { it == user1Id } &&
+                    conv.participants.any { it == user2Id }
         }
     }
 

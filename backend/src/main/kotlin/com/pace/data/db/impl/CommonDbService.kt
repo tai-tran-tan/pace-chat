@@ -7,10 +7,8 @@ import com.pace.data.model.Message
 import com.pace.data.model.User
 import com.pace.data.storage.DataSource
 import io.klogging.java.LoggerFactory
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import kotlinx.datetime.toJavaInstant
-import java.util.*
+import java.time.Instant
+import java.util.UUID
 
 internal class CommonDbService(
     val storage: DataSource
@@ -44,7 +42,12 @@ internal class CommonDbService(
         return storage.searchUsers(query)
     }
 
-    override suspend fun updateUserProfile(userId: String, username: String?, email: String?, avatarUrl: String?): User? {
+    override suspend fun updateUserProfile(
+        userId: String,
+        username: String?,
+        email: String?,
+        avatarUrl: String?
+    ): User? {
         val user = storage.findUserById(userId)
         return user?.apply {
             if (username != null) this.username = username
@@ -64,7 +67,7 @@ internal class CommonDbService(
     }
 
     override suspend fun addDeviceToken(userId: String, deviceToken: String, platform: String) {
-        storage.addDeviceToken(DeviceToken(userId, deviceToken, platform, Clock.System.now()))
+        storage.addDeviceToken(DeviceToken(userId, deviceToken, platform, Instant.now()))
         // In a real app, you might want to replace existing tokens for a user/platform
     }
 
@@ -82,34 +85,46 @@ internal class CommonDbService(
     }
 
     override suspend fun createPrivateConversation(user1Id: String, user2Id: String): Conversation {
-        val user1 = storage.findUserById(user1Id)!!.toUserPublic()
-        val user2 = storage.findUserById(user2Id)!!.toUserPublic()
+        val user1 = storage.findUserById(user1Id)!!
+        val user2 = storage.findUserById(user2Id)!!
         val newConv = Conversation(
-            conversationId = UUID.randomUUID().toString(),
+            conversationId = "conv-private-${user1.username}-${user2.username}",
             type = "private",
             name = null,
-            participants = listOf(user1, user2),
+            participants = mutableListOf(user1Id, user2Id),
             lastMessagePreview = null,
             lastMessageTimestamp = null,
             unreadCount = 0
         )
         storage.addConversation(newConv)
+        user1.conversations.add(newConv.conversationId)
+        user2.conversations.add(newConv.conversationId)
+        storage.updateUser(user1)
+        storage.updateUser(user2)
         logger.info("Created private conversation: ${newConv.conversationId}")
         return newConv
     }
 
-    override suspend fun createGroupConversation(creatorId: String, name: String, participantIds: List<String>): Conversation {
-        val participantsList = participantIds.mapNotNull { findUserById(it)?.toUserPublic() }
+    override suspend fun createGroupConversation(
+        creatorId: String,
+        name: String,
+        participantIds: List<String>
+    ): Conversation {
         val newConv = Conversation(
             conversationId = UUID.randomUUID().toString(),
             type = "group",
             name = name,
-            participants = participantsList,
+            participants = participantIds.toMutableList(),
             lastMessagePreview = null,
             lastMessageTimestamp = null,
             unreadCount = 0
         )
         storage.addConversation(newConv)
+        participantIds.forEach {
+            storage.findUserById(it)!!.apply {
+                conversations.add(newConv.conversationId)
+            }.let { storage.updateUser(it) }
+        }
         logger.info("Created group conversation: ${newConv.conversationId}")
         return newConv
     }
@@ -123,7 +138,7 @@ internal class CommonDbService(
         conversation?.let { conv ->
             if (conv.type != "group") return null
 
-            val currentParticipantIds = conv.participants.map { it.userId }.toMutableSet()
+            val currentParticipantIds = conv.participants
 
             addIds?.forEach { idToAdd ->
                 if (findUserById(idToAdd) != null) {
@@ -139,8 +154,7 @@ internal class CommonDbService(
                 return null // Prevent empty group
             }
 
-            val newParticipants = currentParticipantIds.mapNotNull { findUserById(it)?.toUserPublic() }
-            conv.participants = newParticipants // Update the list reference
+            conv.participants = currentParticipantIds // Update the list reference
             logger.info("Updated participants for conversation: $conversationId")
             return storage.updateConversation(conv)
         }
@@ -153,7 +167,7 @@ internal class CommonDbService(
         limit: Int,
         beforeMessageId: String?
     ): List<Message> {
-       return storage.getMessagesForConversation(conversationId, limit, beforeMessageId)
+        return storage.getMessagesForConversation(conversationId, limit, beforeMessageId)
     }
 
     override suspend fun hasMoreMessages(conversationId: String, oldestMessageId: String?): Boolean {
@@ -183,7 +197,7 @@ internal class CommonDbService(
             senderId = senderId,
             content = content,
             messageType = messageType,
-            timestamp = Clock.System.now(),
+            timestamp = Instant.now(),
             readBy = mutableListOf(senderId),
             clientMessageId = clientMessageId
         )
@@ -206,7 +220,7 @@ internal class CommonDbService(
         val updatedMessages = mutableListOf<Message>()
         var foundLastRead = false
         storage.getMessagesForConversation(conversationId, beforeMessageId = lastReadMessageId)
-            .sortedBy { it.timestamp }
+            .sortedByDescending{ it.timestamp }
             .forEach { msg ->
                 if (msg.messageId == lastReadMessageId) {
                     foundLastRead = true
@@ -214,11 +228,9 @@ internal class CommonDbService(
                 if (foundLastRead && !msg.readBy.contains(readerId)) {
                     msg.readBy.add(readerId)
                     updatedMessages.add(msg)
-                } else if (!foundLastRead && msg.timestamp.toJavaInstant()
-                        .isBefore(storage.findMessageByMessageId(lastReadMessageId)!!.timestamp.toJavaInstant())
-                    && !msg.readBy.contains(
-                        readerId
-                    )
+                } else if (!foundLastRead && msg.timestamp
+                        .isAfter(storage.findMessageByMessageId(lastReadMessageId)!!.timestamp)
+                    && !msg.readBy.contains(readerId)
                 ) {
                     msg.readBy.add(readerId)
                     updatedMessages.add(msg)

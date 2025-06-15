@@ -1,7 +1,7 @@
 package com.pace
 
 import com.google.inject.Guice
-import com.pace.config.Configuration
+import com.pace.config.ApplicationConfiguration
 import com.pace.config.ConfigurationService
 import com.pace.data.db.DbAccessible
 import com.pace.data.db.impl.CommonDbService
@@ -27,28 +27,25 @@ import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.CorsHandler
 import io.vertx.ext.web.handler.JWTAuthHandler
-import kotlinx.serialization.json.Json
 
 class MainVerticle : AbstractVerticle() {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
     private var jwtService: JwtService = JwtService()
     private lateinit var db: DbAccessible
+    private val injector by lazy { Guice.createInjector(BasicGuiceModule(vertx)) }
+
     override fun start() {
-        val injector = Guice.createInjector(BasicGuiceModule(vertx))
-        ConfigurationService.getConfig(vertx).onSuccess { config ->
-            val conf = Json.decodeFromString<Configuration>(config.toString())
+        ConfigurationService.getConfig(vertx).onSuccess { conf ->
             val srcClass = conf.database.let { Class.forName(it.dataSourceClass) }
             db = CommonDbService(
                 injector.getInstance(srcClass) as DataSource
             )
-            bootstrap()
-        }.onFailure { err ->
-            logger.error(err) { "Failed to get configuration" }
+            bootstrap(conf.application)
         }
     }
 
-    private fun bootstrap() {
+    private fun bootstrap(conf: ApplicationConfiguration) {
         // Configure JWT Auth Provider for Vert.x Web
         // In a real app, use asymmetric keys or a more robust key store.
         // For simulation, we'll use a symmetric key directly.
@@ -69,7 +66,7 @@ class MainVerticle : AbstractVerticle() {
 
         // Setup HTTP Router
         val router = Router.router(vertx)
-
+//        router.route().handler { LoggerHandler.create() }
         // CORS Handler (for Flutter Web/Mobile)
         router.route().handler(
             CorsHandler.create()
@@ -85,8 +82,11 @@ class MainVerticle : AbstractVerticle() {
         )
 
         // Body Handler to parse request bodies (JSON)
+//        router.route().handler { ctx ->
+//            LoggerHandler.create()
+//        }
         router.route().handler(BodyHandler.create())
-
+//        router.route().handler(ErrorHandler.create(vertx, true))
         // Public routes
         AuthRouter(router, jwtService, db).setupRoutes()
 
@@ -111,22 +111,23 @@ class MainVerticle : AbstractVerticle() {
 
         router.route("/v1/*").subRouter(protectedRouter) // Mount protected routes under /v1
 
+//        router.route().handler { ctx ->
+//            if (ctx.failure() != null) logger.error(ctx.failure())
+//        }
+
         // WebSocket Handler
         val wsHandler = WebSocketHandler(vertx, jwtService, db, connectionsManager)
 
         // Create HTTP server that also handles WebSockets
-        vertx.createHttpServer(HttpServerOptions().setPort(8080).setHost("0.0.0.0"))
+        vertx.createHttpServer(HttpServerOptions().setPort(conf.port).setHost(conf.host))
             .requestHandler(router) // Handle HTTP requests
-            .webSocketHandler { ws ->
-                // Handle WebSocket connections
-                wsHandler.handle(ws)
-            }
-            .listen(8080)
+            .webSocketHandler { wsHandler.handle(it) } // Handle WebSocket connections
+            .listen(conf.port)
             .onSuccess { http ->
-                logger.info("HTTP and WebSocket server started on port 8080")
+                logger.info("HTTP and WebSocket server started on http://${conf.host}:${conf.port}")
             }
             .onFailure { err ->
-                logger.error(err) { "Failed to start HTTP/WebSocket server: ${err.cause?.message}" }
+                logger.error(err) { "Failed to start HTTP/WebSocket server: ${err.message}" }
             }
     }
 }

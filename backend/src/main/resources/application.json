@@ -1,0 +1,11 @@
+{
+  "database": {
+    "data-source-class": "com.pace.data.db.impl.StargateRestDataSource",
+    "sg-base-url": "http://localhost:8082/v2/keyspaces/pace_chat",
+    "sg-auth-token": "c7e64b0f-fd32-43ef-85c2-f7ccd773d01e"
+  },
+  "application": {
+    "host": "0.0.0.0",
+    "port": 8080
+  }
+}

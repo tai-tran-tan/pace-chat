@@ -1,5 +1,7 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-import org.gradle.api.tasks.testing.logging.TestLogEvent.*
+import org.gradle.api.tasks.testing.logging.TestLogEvent.FAILED
+import org.gradle.api.tasks.testing.logging.TestLogEvent.PASSED
+import org.gradle.api.tasks.testing.logging.TestLogEvent.SKIPPED
 import org.jetbrains.kotlin.gradle.dsl.jvm.JvmTargetValidationMode.IGNORE
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
@@ -52,16 +54,18 @@ dependencies {
     implementation("io.vertx:vertx-auth-jwt:$vertxVersion") // For JWT authentication
     implementation("com.auth0:java-jwt:4.5.0")
     // Kotlinx Serialization for JSON (Vert.x doesn't bundle it, we use it directly)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+//    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.19.0")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+
 
     // Vert.x Kotlin Coroutines
     implementation("io.vertx:vertx-lang-kotlin-coroutines:$vertxVersion")
     implementation("io.vertx:vertx-lang-kotlin:$vertxVersion")
 
     implementation("io.vertx:vertx-config:$vertxVersion")
-    implementation("io.vertx:vertx-config-hocon:$vertxVersion")
+//    implementation("io.vertx:vertx-config-yaml:$vertxVersion")
 
     implementation("com.google.inject:guice:7.0.0")
 
@@ -107,5 +111,11 @@ tasks.withType<Test> {
 }
 
 tasks.withType<JavaExec> {
-    args = listOf("run", mainVerticleName, "--redeploy=$watchForChange", "--launcher-class=$launcherClassName", "--on-redeploy=$doOnChange")
+    args = listOf(
+        "run", mainVerticleName,
+        "--redeploy=$watchForChange",
+        "--launcher-class=$launcherClassName",
+        "--on-redeploy=$doOnChange",
+//        "--java-opts", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000"
+    )
 }

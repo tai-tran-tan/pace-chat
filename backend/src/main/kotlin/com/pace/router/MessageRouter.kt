@@ -4,11 +4,10 @@ package com.pace.router
 import com.pace.data.db.DbAccessible
 import com.pace.data.model.FileUploadResponse
 import com.pace.data.model.MessagesHistoryResponse
+import com.pace.utility.toJsonString
 import io.klogging.java.LoggerFactory
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.util.UUID
 
 class MessageRouter(private val router: Router, private val db: DbAccessible) {
@@ -23,8 +22,8 @@ class MessageRouter(private val router: Router, private val db: DbAccessible) {
             val beforeMessageId = rc.request().getParam("before_message_id")
 
             val conversation = db.findConversationById(conversationId)
-            if (conversation == null || !conversation.participants.any { it.userId == userId }) {
-                rc.response().setStatusCode(404).end(Json.encodeToString(mapOf("message" to "Conversation not found or not accessible")))
+            if (conversation == null || !conversation.participants.any { it == userId }) {
+                rc.response().setStatusCode(404).end(mapOf("message" to "Conversation not found or not accessible").toJsonString())
                 return@coroutineHandler
             }
 
@@ -32,13 +31,13 @@ class MessageRouter(private val router: Router, private val db: DbAccessible) {
             val hasMore = db.hasMoreMessages(conversationId, messages.firstOrNull()?.messageId)
             val nextBeforeMessageId = if (hasMore && messages.isNotEmpty()) messages.first().messageId else null
 
-            rc.response().setStatusCode(200).end(Json.encodeToString(MessagesHistoryResponse(messages, hasMore, nextBeforeMessageId)))
+            rc.response().setStatusCode(200).end(MessagesHistoryResponse(messages, hasMore, nextBeforeMessageId).toJsonString())
         }
 
         router.post("/messages/upload").handler(BodyHandler.create().setHandleFileUploads(true)).coroutineHandler { rc ->
             val uploads = rc.fileUploads()
             if (uploads.isEmpty()) {
-                rc.response().setStatusCode(400).end(Json.encodeToString(mapOf("message" to "No file provided")))
+                rc.response().setStatusCode(400).end(mapOf("message" to "No file provided").toJsonString())
                 return@coroutineHandler
             }
 
@@ -51,7 +50,7 @@ class MessageRouter(private val router: Router, private val db: DbAccessible) {
 
             // Simulate file storage and return a dummy URL
             val fileUrl = "https://placehold.co/150x150/png?text=UploadedFile&file=${UUID.randomUUID()}_$fileName"
-            rc.response().setStatusCode(201).end(Json.encodeToString(FileUploadResponse(fileUrl, contentType, fileSize)))
+            rc.response().setStatusCode(201).end(FileUploadResponse(fileUrl, contentType, fileSize).toJsonString())
             logger.info("Dummy file uploaded: $fileName, size: $fileSize, temp path: ${upload.uploadedFileName()}")
 
             // Cleanup temp file (Vert.x BodyHandler deletes temp files by default after response)

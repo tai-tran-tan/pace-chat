@@ -2,8 +2,8 @@
 package com.pace.ws
 
 import com.pace.data.db.DbAccessible
+import com.pace.utility.toJsonString
 import io.klogging.java.LoggerFactory
-import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 
 class ConnectionsManager(private val db: DbAccessible) {
@@ -23,32 +23,32 @@ class ConnectionsManager(private val db: DbAccessible) {
         }
     }
 
-    fun sendMessageToUser(userId: String, message: String) {
+    fun sendMessageToUser(userId: String, message: Any) {
         val connection = connections[userId]
         if (connection != null && !connection.session.isClosed) {
-            connection.session.writeTextMessage(message)
+            connection.session.writeTextMessage(message.toJsonString())
             logger.debug("Sent message to user $userId: $message")
         } else {
             logger.warn("User $userId not connected or session closed. Message not sent: $message")
         }
     }
 
-    fun broadcastMessage(message: String, excludeConnection: Connection? = null) {
+    fun broadcastMessage(message: Any, excludeConnection: Connection? = null) {
         connections.values.forEach { connection ->
             if (connection != excludeConnection && !connection.session.isClosed) {
-                connection.session.writeTextMessage(message)
+                connection.session.writeTextMessage(message.toJsonString())
             }
         }
         logger.debug("Broadcasted message to ${connections.size - (if (excludeConnection != null) 1 else 0)} clients: $message")
     }
 
-    fun broadcastMessageToConversationParticipants(conversationId: String, message: String) {
-        val conversation = runBlocking { db.findConversationById(conversationId) }
+    suspend fun broadcastMessageToConversationParticipants(conversationId: String, message: Any) {
+        val conversation = db.findConversationById(conversationId)
         if (conversation != null) {
             conversation.participants.forEach { participant ->
-                sendMessageToUser(participant.userId, message)
+                sendMessageToUser(participant, message)
             }
-            logger.debug("Broadcasted message to participants of conversation $conversationId: $message")
+            logger.debug("Broadcasted message to participants of conversation $conversationId: ${message.toJsonString()}")
         } else {
             logger.warn("Attempted to broadcast to non-existent conversation: $conversationId")
         }

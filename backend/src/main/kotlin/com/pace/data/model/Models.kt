@@ -3,27 +3,34 @@ package com.pace.data.model
 
 //import kotlinx.serialization.SerialName
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.annotation.JsonNaming
-import kotlinx.datetime.Instant
-import java.util.*
+import com.pace.data.model.deserializer.InstantWithNanoSecondDeserializer
+import com.pace.data.model.deserializer.ValueToHashConverter
+import io.vertx.core.json.JsonObject
+import java.time.Instant
+import java.util.UUID
 
-// Using @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class) for kotlinx.serialization
-
-// --- User Models ---
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class User(
     val userId: String = UUID.randomUUID().toString(),
     var username: String,
     var email: String,
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     val password: String, // In a real app, this should be hashed and not returned
     var status: String, // online, offline, away
-    val conversations: List<Conversation> = mutableListOf(),
+    val conversations: MutableList<String> = mutableListOf(),
     var avatarUrl: String?,
+    @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
     var lastSeen: Instant?
 ) {
     fun toUserPublic() = UserPublic(userId, username, avatarUrl)
     fun toUserResponse() = UserResponse(userId, username, email, status, avatarUrl, lastSeen)
+    fun toUpdateRequestBody() = JsonObject.mapFrom(this).apply {
+        remove("user_id")
+    }
 }
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
@@ -40,6 +47,7 @@ data class UserResponse(
     val email: String,
     val status: String,
     val avatarUrl: String?,
+    @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
     val lastSeen: Instant?
 )
 
@@ -55,6 +63,7 @@ data class ProfileUpdate(
 data class AuthRegisterRequest @JsonCreator constructor(
     val username: String,
     val email: String,
+    @JsonDeserialize(converter = ValueToHashConverter::class)
     val password: String
 )
 
@@ -66,7 +75,11 @@ data class AuthRegisterResponse(
 )
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-data class AuthLoginRequest (val username: String, val password: String)
+data class AuthLoginRequest (
+    val username: String,
+    @JsonDeserialize(converter = ValueToHashConverter::class)
+    val password: String
+)
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class AuthLoginResponse(
@@ -88,11 +101,16 @@ data class Conversation(
     val conversationId: String,
     val type: String, // "private" or "group"
     var name: String?, // For group chats, null for private
-    var participants: List<UserPublic>, // List of participants with public info
+    var participants: MutableList<String>, // List of participants with public info
     var lastMessagePreview: String?,
+    @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
     var lastMessageTimestamp: Instant?,
     var unreadCount: Int // Simplified, backend might not actually calculate this
-)
+) {
+    fun toUpdateRequestBody() = JsonObject.mapFrom(this).apply {
+        remove("conversation_id")
+    }
+}
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class ConversationPrivateRequest @JsonCreator constructor(
@@ -119,10 +137,17 @@ data class Message(
     val senderId: String,
     val content: String,
     val messageType: String, // "text", "image", "video", "file"
+    @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
     val timestamp: Instant,
     val readBy: MutableList<String> = mutableListOf(), // User IDs who have read this message
     val clientMessageId: String? = null // Optional: for client-side tracking before server ACK
-)
+) {
+    fun toUpdateRequestBody() = JsonObject.mapFrom(this).apply {
+        remove("message_id")
+//        remove("conversation_id")
+//        remove("timestamp")
+    }
+}
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class MessagesHistoryResponse(
@@ -144,6 +169,7 @@ data class DeviceToken(
     val userId: String,
     val deviceToken: String,
     val platform: String, // "android", "ios"
+    @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
     val registeredAt: Instant
 )
 
@@ -152,6 +178,11 @@ data class DeviceToken(
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 sealed class WsMessage {
     abstract val type: EventType // Common property for all WebSocket messages
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
+    data class WsPingMessage(
+        override val type: EventType = EventType.PING,
+    ) : WsMessage()
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 //    @SerialName("AUTH")
@@ -190,6 +221,7 @@ sealed class WsMessage {
         override val type: EventType = EventType.MESSAGE_DELIVERED,
         val clientMessageId: String, // Echoes client's ID
         val serverMessageId: String, // Server's actual message ID
+        @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
         val timestamp: Instant,
         val status: String // "success" or "failure"
     ) : WsMessage()
@@ -225,15 +257,16 @@ sealed class WsMessage {
         val conversationId: String,
         val messageId: String, // The specific message ID that was read (or up to which was read)
         val readerId: String,
+        @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
         val readAt: Instant
     ) : WsMessage()
-
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 //    @SerialName("PRESENCE_UPDATE")
     data class WsPresenceUpdate(
         override val type: EventType = EventType.PRESENCE_UPDATE,
         val userId: String,
         val status: UserStatus, // "online", "offline", "away"
+        @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
         val lastSeen: Instant?
     ) : WsMessage()
 
@@ -258,7 +291,8 @@ sealed class WsMessage {
         SEND_MESSAGE,
         AUTH_FAILURE,
         AUTH_SUCCESS,
-        AUTH
+        AUTH,
+        PING
     }
 
     enum class UserStatus {
