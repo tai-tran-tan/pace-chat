@@ -1,6 +1,6 @@
 1. Start Cassandra and startgate
 ```bash
-docker compose up -f docker-compose.yaml -d
+docker compose -f up docker-compose.yaml -d
 ```
 2. Create schema and dummy data
 ```bash

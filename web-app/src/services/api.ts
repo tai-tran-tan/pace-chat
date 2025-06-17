@@ -11,20 +11,37 @@ import {
   FileUploadResponse,
   SearchResult,
   PaginatedResponse,
-  PaginationParams
+  PaginationParams,
+  UserSearchResult
 } from '@/types';
 import { getToast } from '@/lib/utils';
 
 class ApiService {
   private api: AxiosInstance;
+  private refreshApi: AxiosInstance;
   private baseURL: string;
   private isDevelopment: boolean;
+  private isRefreshing: boolean = false;
+  private failedQueue: Array<{
+    resolve: (value: any) => void;
+    reject: (error: any) => void;
+  }> = [];
 
   constructor() {
-    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1';
+    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
     this.isDevelopment = process.env.NODE_ENV === 'development';
     
+    // Create main API instance
     this.api = axios.create({
+      baseURL: this.baseURL,
+      timeout: 10000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    // Create separate instance for refresh token to avoid infinite loop
+    this.refreshApi = axios.create({
       baseURL: this.baseURL,
       timeout: 10000,
       headers: {
@@ -52,27 +69,57 @@ class ApiService {
       async (error) => {
         const originalRequest = error.config;
 
-        // Handle token refresh for 401 errors
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // Handle token refresh for 401 errors (skip auth endpoints)
+        if (error.response?.status === 401 && !originalRequest._retry && !this.isAuthEndpoint(originalRequest.url)) {
+          if (this.isRefreshing) {
+            // If already refreshing, queue this request
+            return new Promise((resolve, reject) => {
+              this.failedQueue.push({ resolve, reject });
+            }).then((token) => {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              return this.api(originalRequest);
+            }).catch((err) => {
+              return Promise.reject(err);
+            });
+          }
+
           originalRequest._retry = true;
+          this.isRefreshing = true;
 
           try {
             const refreshToken = this.getRefreshToken();
             if (refreshToken) {
-              const response = await this.refreshToken(refreshToken);
-              this.setTokens(response.data.access_token, response.data.refresh_token);
-              originalRequest.headers.Authorization = `Bearer ${response.data.access_token}`;
+              // Use separate refreshApi instance to avoid infinite loop
+              const response = await this.refreshApi.post('/auth/refresh', { 
+                refresh_token: refreshToken 
+              });
+              const newToken = response.data.data.access_token;
+              this.setTokens(newToken, response.data.data.refresh_token);
+              
+              // Process queued requests
+              this.processQueue(null, newToken);
+              
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
               return this.api(originalRequest);
+            } else {
+              this.processQueue(new Error('No refresh token available'));
+              this.clearTokens();
+              window.location.href = '/auth/login';
+              return Promise.reject(error);
             }
           } catch (refreshError) {
+            // If refresh token fails, clear tokens and redirect to login
+            this.processQueue(refreshError);
             this.clearTokens();
             window.location.href = '/auth/login';
             return Promise.reject(refreshError);
+          } finally {
+            this.isRefreshing = false;
           }
         }
 
-        // Global error handling for development mode
-        if (this.isDevelopment) {
+        // Global error handling for development mode (skip auth endpoints)
+        if (this.isDevelopment && !this.isAuthEndpoint(originalRequest.url)) {
           this.handleDevelopmentError(error);
         }
 
@@ -265,17 +312,19 @@ class ApiService {
   // Auth endpoints
   async login(credentials: LoginRequest): Promise<AxiosResponse<ApiResponse<LoginResponse>>> {
     const response = await this.api.post('/auth/login', credentials);
-    if (response.data.success) {
-      this.setTokens(response.data.data.access_token, response.data.data.refresh_token);
+    
+    // Check if response has the expected structure
+    if (response.data && response.data.user_id && response.data.token) {
+      this.setTokens(response.data.token, response.data.refresh_token);
     }
     return response;
   }
 
   async register(userData: RegisterRequest): Promise<AxiosResponse<ApiResponse<RegisterResponse>>> {
     const response = await this.api.post('/auth/register', userData);
-    if (response.data.success) {
-      this.setTokens(response.data.data.access_token, response.data.data.refresh_token);
-    }
+    
+    // Register response doesn't include tokens, so we don't set them here
+    // User will need to login after registration to get tokens
     return response;
   }
 
@@ -286,7 +335,7 @@ class ApiService {
   }
 
   async refreshToken(token: string): Promise<AxiosResponse<ApiResponse<LoginResponse>>> {
-    return this.api.post('/auth/refresh', { refresh_token: token });
+    return this.refreshApi.post('/auth/refresh', { refresh_token: token });
   }
 
   async getCurrentUser(): Promise<AxiosResponse<ApiResponse<User>>> {
@@ -325,12 +374,26 @@ class ApiService {
     return this.api.get(`/conversations/${conversationId}`);
   }
 
-  async createConversation(participantIds: string[], name?: string): Promise<AxiosResponse<ApiResponse<Conversation>>> {
-    return this.api.post('/conversations', {
-      participant_ids: participantIds,
-      name,
-      type: participantIds.length > 1 ? 'group' : 'direct',
+  async createPrivateConversation(targetUserId: string): Promise<AxiosResponse<ApiResponse<Conversation>>> {
+    return this.api.post('/conversations/private', {
+      target_user_id: targetUserId,
     });
+  }
+
+  async createGroupConversation(name: string, participantIds: string[]): Promise<AxiosResponse<ApiResponse<Conversation>>> {
+    return this.api.post('/conversations/group', {
+      name,
+      participant_ids: participantIds,
+    });
+  }
+
+  async createConversation(participantIds: string[], name?: string): Promise<AxiosResponse<ApiResponse<Conversation>>> {
+    // Legacy method for backward compatibility
+    if (participantIds.length === 1) {
+      return this.createPrivateConversation(participantIds[0]);
+    } else {
+      return this.createGroupConversation(name || 'Group Chat', participantIds);
+    }
   }
 
   async updateConversation(conversationId: string, updates: Partial<Conversation>): Promise<AxiosResponse<ApiResponse<Conversation>>> {
@@ -375,12 +438,32 @@ class ApiService {
 
   // Search endpoints
   async search(query: string): Promise<AxiosResponse<ApiResponse<SearchResult>>> {
-    return this.api.get('/search', { params: { q: query } });
+    return this.api.get(`/search?q=${encodeURIComponent(query)}`);
+  }
+
+  async searchUsers(query: string): Promise<AxiosResponse<UserSearchResult[]>> {
+    return this.api.get(`/users/search?query=${encodeURIComponent(query)}`);
   }
 
   // Health check
   async healthCheck(): Promise<AxiosResponse<ApiResponse>> {
     return this.api.get('/health');
+  }
+
+  private processQueue(error: any, token: string | null = null) {
+    this.failedQueue.forEach(({ resolve, reject }) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(token);
+      }
+    });
+    this.failedQueue = [];
+  }
+
+  private isAuthEndpoint(url: string | undefined): boolean {
+    const authEndpoints = ['/auth/login', '/auth/register', '/auth/logout', '/auth/refresh', '/auth/me'];
+    return authEndpoints.some(endpoint => url?.includes(endpoint) || false);
   }
 }
 

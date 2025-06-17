@@ -128,7 +128,16 @@ export function isBrowser(): boolean {
  */
 export function getSystemTheme(): 'light' | 'dark' {
   if (!isBrowser()) return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  
+  try {
+    if (typeof window.matchMedia === 'function') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return 'light';
+  } catch (error) {
+    // Fallback to light theme if matchMedia is not available
+    return 'light';
+  }
 }
 
 /**

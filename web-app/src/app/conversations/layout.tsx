@@ -7,7 +7,9 @@ import { useMessageStore } from '@/store/useMessageStore';
 import { useConversationSync } from '@/hooks/useConversationSync';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
+import { toast } from '@/components/ui/toaster';
 import socketService from '@/services/socket';
+import conversationService from '@/services/conversationService';
 
 export default function ConversationsLayout({ children }: { children: React.ReactNode }) {
   const { conversations, fetchConversations, resetConversationUnreadCount } = useConversationStore();
@@ -56,11 +58,30 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     router.push(`/conversations/${conversationId}`);
   };
 
+  const handleUserClick = async (userId: string) => {
+    try {
+      console.log('🔍 User clicked:', userId);
+      console.log('🔍 Current user:', user);
+      
+      // Create new private conversation with the user
+      console.log('🔍 Creating private conversation...');
+      const newConversation = await conversationService.createPrivateConversation(userId);
+      console.log('✅ New conversation created:', newConversation);
+      
+      // Navigate to the new conversation
+      console.log('🔍 Navigating to conversation:', newConversation.conversation_id);
+      router.push(`/conversations/${newConversation.conversation_id}`);
+    } catch (error) {
+      console.error('❌ Failed to create conversation:', error);
+      toast.error('Failed to create conversation. Please try again later.');
+    }
+  };
+
   // Mapping conversations sang chatItems cho Sidebar
   const chatItems = conversations.map((conv) => {
     let avatar = '';
     let name = '';
-    if (conv.type === 'private') {
+    if (conv.type === 'private' && conv.participants) {
       const other = conv.participants.find((p) => p.user_id !== user?.user_id);
       avatar = other?.avatar_url || '/avatar-placeholder.png';
       name = other?.username || 'Unknown User';
@@ -88,14 +109,20 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       selected: false,
     };
   });
-    
+
   return (
     <div className='flex h-screen bg-blue-50'>
-      <Sidebar chatItems={chatItems} user={{
-        avatar: user?.avatar_url,
-        username: user?.username || '',
-        email: user?.email || undefined,
-      }} onLogout={handleLogout} onItemClick={handleItemClick} />
+      <Sidebar 
+        chatItems={chatItems} 
+        user={{
+          avatar: user?.avatar_url,
+          username: user?.username || '',
+          email: user?.email || undefined,
+        }} 
+        onLogout={handleLogout} 
+        onItemClick={handleItemClick}
+        onUserClick={handleUserClick}
+      />
       <main className='flex-1 flex flex-col'>{children}</main>
     </div>
   );
