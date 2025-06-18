@@ -37,7 +37,9 @@ export default function LoginPage() {
       toast.success('Login successful!');
       router.push('/conversations');
     } catch (error) {
-      // Do not navigate if login fails
+      // Error is handled by the auth store and displayed in UI
+      // Do not refresh the page, let the error display in UI
+      console.log('Login error handled by store:', error);
     }
   };
 

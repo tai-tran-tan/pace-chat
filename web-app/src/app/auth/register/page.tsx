@@ -40,11 +40,14 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormData) => {
     try {
       await registerUser(data.username, data.email, data.password);
-      toast.success('Registration successful!');
-      router.push('/conversations');
+      toast.success('Registration successful! Please sign in to continue.');
+      setTimeout(() => {
+        router.push('/auth/login');
+      }, 3000);
     } catch (error) {
-      // Error is handled globally by API service in development mode
-      // Error state is also handled by the store for UI display
+      // Error is handled by the auth store and displayed in UI
+      // Do not refresh the page, let the error display in UI
+      console.log('Registration error handled by store:', error);
     }
   };
 

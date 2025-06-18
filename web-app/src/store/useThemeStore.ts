@@ -14,6 +14,18 @@ interface ThemeActions {
 
 type ThemeStore = ThemeState & ThemeActions;
 
+// Helper function to apply theme to document
+const applyThemeToDocument = (isDark: boolean) => {
+  if (typeof window !== 'undefined') {
+    const root = document.documentElement;
+    if (isDark) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }
+};
+
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set, get) => ({
@@ -28,14 +40,7 @@ export const useThemeStore = create<ThemeStore>()(
         set({ mode, isDark });
         
         // Apply theme to document
-        if (typeof window !== 'undefined') {
-          const root = document.documentElement;
-          if (isDark) {
-            root.classList.add('dark');
-          } else {
-            root.classList.remove('dark');
-          }
-        }
+        applyThemeToDocument(isDark);
       },
 
       toggle: () => {
@@ -48,19 +53,15 @@ export const useThemeStore = create<ThemeStore>()(
       name: 'theme-storage',
       partialize: (state) => ({ mode: state.mode }),
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          // Apply theme on rehydration
+        if (state && typeof window !== 'undefined') {
+          // Apply theme on rehydration only on client side
           const isDark = state.mode === 'dark' || (state.mode === 'system' && getSystemTheme() === 'dark');
           state.isDark = isDark;
           
-          if (typeof window !== 'undefined') {
-            const root = document.documentElement;
-            if (isDark) {
-              root.classList.add('dark');
-            } else {
-              root.classList.remove('dark');
-            }
-          }
+          // Use setTimeout to ensure DOM is ready
+          setTimeout(() => {
+            applyThemeToDocument(isDark);
+          }, 0);
         }
       },
     }

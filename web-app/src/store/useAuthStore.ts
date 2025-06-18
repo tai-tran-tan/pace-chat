@@ -48,16 +48,23 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
         try {
           const response = await apiService.login({ username, password });
-          if (response.status === 200 && response.data && response.data.user_id) {
-            // Store tokens
-            if (response.data.token) {
-              localStorage.setItem('access_token', response.data.token);
-            }
-            if (response.data.refresh_token) {
-              localStorage.setItem('refresh_token', response.data.refresh_token);
-            }
+          
+          // Check if response has the expected structure
+          if (response.data && response.data.user_id && response.data.token) {
+            // Create user object from response
+            const userData = {
+              user_id: response.data.user_id,
+              username: response.data.username,
+              email: response.data.email || '',
+              avatar_url: response.data.avatar_url || null,
+              status: 'online' as const,
+              last_seen: response.data.last_seen || null,
+              created_at: response.data.created_at || '',
+              updated_at: response.data.updated_at || '',
+            };
+            
             set({
-              user: mapApiUserToUser(response.data),
+              user: userData,
               isAuthenticated: true,
               isLoading: false,
               error: null,
@@ -82,6 +89,7 @@ export const useAuthStore = create<AuthStore>()(
           } else if (error.code === 'NETWORK_ERROR') {
             errorMessage = 'Network error. Please check your connection.';
           }
+          
           set({
             isLoading: false,
             error: errorMessage,
@@ -94,25 +102,23 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
         try {
           const response = await apiService.register({ username, email, password });
-          if (response.status === 200 && response.data && response.data.user_id) {
-            if (response.data.token) {
-              localStorage.setItem('access_token', response.data.token);
-            }
-            if (response.data.refresh_token) {
-              localStorage.setItem('refresh_token', response.data.refresh_token);
-            }
+          
+          // Check if response has the expected structure for register
+          if (response.data && response.data.user_id && response.data.username) {
+            // Registration successful, but don't set user as authenticated
+            // User needs to login to get tokens
             set({
-              user: mapApiUserToUser(response.data),
-              isAuthenticated: true,
               isLoading: false,
               error: null,
             });
+            return;
           } else {
             const errorMessage = response.data.message || 'Registration failed';
             set({
               isLoading: false,
               error: errorMessage,
             });
+            throw new Error(errorMessage);
           }
         } catch (error: any) {
           let errorMessage = 'Registration failed';
@@ -129,6 +135,7 @@ export const useAuthStore = create<AuthStore>()(
             isLoading: false,
             error: errorMessage,
           });
+          throw new Error(errorMessage);
         }
       },
 
@@ -165,9 +172,22 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true });
         try {
           const response = await apiService.getCurrentUser();
-          if (response.status === 200 && response.data && response.data.user_id) {
+          
+          // Check if response has the expected structure
+          if (response.data && response.data.user_id) {
+            const userData = {
+              user_id: response.data.user_id,
+              username: response.data.username,
+              email: response.data.email || '',
+              avatar_url: response.data.avatar_url || null,
+              status: 'online' as const,
+              last_seen: response.data.last_seen || null,
+              created_at: response.data.created_at || '',
+              updated_at: response.data.updated_at || '',
+            };
+            
             set({
-              user: mapApiUserToUser(response.data),
+              user: userData,
               isAuthenticated: true,
               isLoading: false,
               error: null,

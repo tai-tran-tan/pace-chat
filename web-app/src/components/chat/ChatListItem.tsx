@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
 interface ChatListItemProps {
   conversationId: string;
@@ -6,7 +6,7 @@ interface ChatListItemProps {
   name: string;
   lastMessage: string;
   unreadCount?: number;
-  time: string; // ISO string
+  time: string;
   selected?: boolean;
   onClick?: () => void;
 }
@@ -20,37 +20,63 @@ const ChatListItem: React.FC<ChatListItemProps> = ({
   selected = false,
   onClick,
 }) => {
-    console.log('time', time);
-  const [displayTime, setDisplayTime] = useState('');
-
-  useEffect(() => {
-    if (time) {
-      setDisplayTime(new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    } else {
-      setDisplayTime('');
+  const renderAvatar = () => {
+    if (avatar && avatar.trim()) {
+      return (
+        <img
+          src={avatar}
+          alt={name}
+          className="w-10 h-10 rounded-full object-cover border border-gray-300"
+          onError={(e) => {
+            // Fallback to default avatar on error
+            const target = e.target as HTMLImageElement;
+            target.style.display = 'none';
+            target.nextElementSibling?.classList.remove('hidden');
+          }}
+        />
+      );
     }
-  }, [time]);
+    
+    return (
+      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center border border-gray-300">
+        <span className="text-sm font-medium text-gray-600">
+          {name.charAt(0).toUpperCase()}
+        </span>
+      </div>
+    );
+  };
 
   return (
     <div
-      className={`flex items-center px-4 py-3 cursor-pointer transition bg-white hover:bg-gray-100 ${selected ? 'shadow-lg rounded-xl' : ''}`}
+      className={`flex items-center px-4 py-3 cursor-pointer transition-colors hover:bg-gray-50 ${
+        selected ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+      }`}
       onClick={onClick}
     >
-      <img
-        src={'https://i.pravatar.cc/50' || avatar}
-        alt={name}
-        className='w-10 h-10 rounded-full object-cover border border-gray-300'
-      />
-      <div className='flex-1 ml-3 min-w-0'>
-        <div className='flex justify-between items-center'>
-          <span className='font-semibold text-sm truncate'>{name}</span>
-          {/* <span className='text-xs text-gray-400'>{displayTime}</span> */}
-        </div>
-        <div className='flex justify-between items-center mt-1'>
-          <span className='text-xs text-gray-500 truncate'>{lastMessage}</span>
-          {unreadCount ? (
-            <span className='ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5'>{unreadCount}</span>
-          ) : null}
+      <div className="relative">
+        {renderAvatar()}
+        {unreadCount && unreadCount > 0 && (
+          <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </div>
+        )}
+      </div>
+      
+      <div className="flex-1 ml-3 min-w-0">
+        <div className="flex justify-between items-start">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-medium text-sm text-gray-900 truncate">
+              {name}
+            </h3>
+            <p className="text-xs text-gray-500 truncate mt-1">
+              {lastMessage}
+            </p>
+          </div>
+          <div className="flex flex-col items-end ml-2">
+            <span className="text-xs text-gray-400 whitespace-nowrap">
+              {time}
+            </span>
+          </div>
         </div>
       </div>
     </div>

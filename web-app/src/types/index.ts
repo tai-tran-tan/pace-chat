@@ -16,7 +16,8 @@ export interface Conversation {
   name?: string | null;
   type: 'private' | 'group';
   participants: ConversationParticipant[];
-  last_message?: Message | null;
+  last_message_preview?: string | null;
+  last_message_timestamp?: string | null;
   unread_count: number;
   created_at: string;
   updated_at: string;
@@ -107,11 +108,10 @@ export interface WsPresenceUpdate extends WsMessage {
 }
 
 // API Response types
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
+export interface ApiResponse<T> {
+  data: T;
   message?: string;
-  error?: string;
+  success: boolean;
 }
 
 export interface LoginRequest {
@@ -183,6 +183,36 @@ export interface FileUploadResponse {
 export interface SearchResult {
   conversations: Conversation[];
   users: User[];
+}
+
+// User search result type (simplified for search)
+export interface UserSearchResult {
+  user_id: string;
+  username: string;
+  avatar_url?: string | null;
+}
+
+// Conversation search result type
+export interface ConversationSearchResult {
+  conversation_id: string;
+  type: 'private' | 'group';
+  name?: string | null;
+  participants: UserSearchResult[];
+  last_message_preview?: string | null;
+  last_message_timestamp?: string | null;
+  unread_count: number;
+}
+
+// Search state type
+export interface SearchState {
+  query: string;
+  results: {
+    users: UserSearchResult[];
+    conversations: ConversationSearchResult[];
+  };
+  isLoading: boolean;
+  isSearching: boolean;
+  error: string | null;
 }
 
 // Error types

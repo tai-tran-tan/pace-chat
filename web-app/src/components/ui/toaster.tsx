@@ -92,8 +92,19 @@ export function useToaster() {
 // Toaster component
 export function Toaster() {
   const { toasts, removeToast } = useToaster();
+  const [isMounted, setIsMounted] = useState(false);
 
-  if (typeof window === 'undefined') return null;
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
+
+  if (typeof window === 'undefined' || !document.body) {
+    return null;
+  }
 
   return createPortal(
     <ToasterComponent toasts={toasts} removeToast={removeToast} />,

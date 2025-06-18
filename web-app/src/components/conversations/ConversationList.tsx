@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, MessageCircle, Users, MoreVertical } from 'lucide-react';
 import { useConversationStore } from '@/store/useConversationStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { formatRelativeTime, getInitials, truncateText } from '@/lib/utils';
+import { getInitials, truncateText } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { Conversation } from '@/types';
 import { useRouter } from 'next/navigation';
@@ -13,7 +13,6 @@ export default function ConversationList() {
   const {
     conversations,
     isLoading,
-    isRefreshing,
     error,
     fetchConversations,
     clearError,
@@ -35,9 +34,9 @@ export default function ConversationList() {
     const searchLower = searchQuery.toLowerCase();
     return (
       getConversationDisplayName(conversation).toLowerCase().includes(searchLower) ||
-      conversation.participants.some((participant) =>
+      (conversation.participants && conversation.participants.some((participant) =>
         participant.username.toLowerCase().includes(searchLower)
-      )
+      ))
     );
   });
 
@@ -47,7 +46,7 @@ export default function ConversationList() {
 
   // Get display name for conversation (same logic as mobile HomeScreen)
   const getConversationDisplayName = (conversation: Conversation): string => {
-    if (conversation.type === 'private') {
+    if (conversation.type === 'private' && conversation.participants) {
       const otherParticipant = conversation.participants.find(
         (p) => p.user_id !== user?.user_id
       );
@@ -59,7 +58,7 @@ export default function ConversationList() {
 
   // Get avatar for conversation (same logic as mobile HomeScreen)
   const getConversationAvatar = (conversation: Conversation): string | null => {
-    if (conversation.type === 'private') {
+    if (conversation.type === 'private' && conversation.participants) {
       const otherParticipant = conversation.participants.find(
         (p) => p.user_id !== user?.user_id
       );
@@ -72,7 +71,7 @@ export default function ConversationList() {
 
   // Get conversation status (same logic as mobile HomeScreen)
   const getConversationStatus = (conversation: Conversation): 'online' | 'offline' | 'away' => {
-    if (conversation.type === 'private') {
+    if (conversation.type === 'private' && conversation.participants) {
       const otherParticipant = conversation.participants.find(
         (p) => p.user_id !== user?.user_id
       );
