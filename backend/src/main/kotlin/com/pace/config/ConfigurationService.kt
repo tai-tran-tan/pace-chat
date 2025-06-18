@@ -35,8 +35,8 @@ object ConfigurationService {
     private fun retrieveConfig(vertx: Vertx): Future<Configuration> {
         val fileStore = ConfigStoreOptions()
             .setType("file")
-            .setFormat("json")
-            .setConfig(JsonObject().put("path", "application.json"))
+            .setFormat("hocon")
+            .setConfig(JsonObject().put("path", "application.conf"))
 
         val sysPropsStore = ConfigStoreOptions().setType("sys")
 

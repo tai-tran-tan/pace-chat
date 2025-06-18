@@ -144,8 +144,6 @@ data class Message(
 ) {
     fun toUpdateRequestBody() = JsonObject.mapFrom(this).apply {
         remove("message_id")
-//        remove("conversation_id")
-//        remove("timestamp")
     }
 }
 
@@ -185,28 +183,24 @@ sealed class WsMessage {
     ) : WsMessage()
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-//    @SerialName("AUTH")
     data class WsAuthMessage(
         override val type: EventType = EventType.AUTH,
         val token: String
     ) : WsMessage()
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-//    @SerialName("AUTH_SUCCESS")
     data class WsAuthSuccess(
         override val type: EventType = EventType.AUTH_SUCCESS,
         val userId: String
     ) : WsMessage()
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-//    @SerialName("AUTH_FAILURE")
     data class WsAuthFailure(
         override val type: EventType = EventType.AUTH_FAILURE,
         val reason: String
     ) : WsMessage()
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-//    @SerialName("SEND_MESSAGE")
     data class SendMessage(
         override val type: EventType = EventType.SEND_MESSAGE,
         val conversationId: String,
@@ -216,7 +210,6 @@ sealed class WsMessage {
     ) : WsMessage()
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-//    @SerialName("MESSAGE_DELIVERED")
     data class MessageDelivered(
         override val type: EventType = EventType.MESSAGE_DELIVERED,
         val clientMessageId: String, // Echoes client's ID
@@ -227,14 +220,12 @@ sealed class WsMessage {
     ) : WsMessage()
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-//    @SerialName("MESSAGE_RECEIVED")
     data class MessageReceived(
         override val type: EventType = EventType.MESSAGE_RECEIVED,
         val message: Message // The full message object
     ) : WsMessage()
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-//    @SerialName("TYPING_INDICATOR")
     data class TypingIndicator(
         override val type: EventType = EventType.TYPING_INDICATOR,
         val conversationId: String,
@@ -243,7 +234,6 @@ sealed class WsMessage {
     ) : WsMessage()
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-//    @SerialName("READ_RECEIPT")
     data class ReadReceipt(
         override val type: EventType = EventType.READ_RECEIPT,
         val conversationId: String,
@@ -251,7 +241,6 @@ sealed class WsMessage {
     ) : WsMessage()
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-//    @SerialName("MESSAGE_READ_STATUS")
     data class WsMessageReadStatus(
         override val type: EventType = EventType.MESSAGE_READ_STATUS,
         val conversationId: String,
@@ -261,7 +250,6 @@ sealed class WsMessage {
         val readAt: Instant
     ) : WsMessage()
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-//    @SerialName("PRESENCE_UPDATE")
     data class WsPresenceUpdate(
         override val type: EventType = EventType.PRESENCE_UPDATE,
         val userId: String,
@@ -271,7 +259,6 @@ sealed class WsMessage {
     ) : WsMessage()
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-//    @SerialName("CONVERSATION_UPDATE")
     data class ConversationUpdate(
         override val type: EventType = EventType.CONVERSATION_UPDATE,
         val conversationId: String,

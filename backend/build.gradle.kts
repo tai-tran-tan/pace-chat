@@ -65,6 +65,7 @@ dependencies {
     implementation("io.vertx:vertx-lang-kotlin:$vertxVersion")
 
     implementation("io.vertx:vertx-config:$vertxVersion")
+    implementation("io.vertx:vertx-config-hocon:$vertxVersion")
 //    implementation("io.vertx:vertx-config-yaml:$vertxVersion")
 
     implementation("com.google.inject:guice:7.0.0")

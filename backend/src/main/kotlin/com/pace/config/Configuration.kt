@@ -14,7 +14,9 @@ data class Configuration @JsonCreator constructor(
 data class DatabaseConfiguration @JsonCreator constructor(
     val dataSourceClass: String,
     val sgBaseUrl: String,
-    val sgAuthToken: String
+    val sgAuthToken: String,
+    val sgAuthUsername: String,
+    val sgAuthPassword: String,
 )
 
 @JsonNaming(PropertyNamingStrategies.KebabCaseStrategy::class)
