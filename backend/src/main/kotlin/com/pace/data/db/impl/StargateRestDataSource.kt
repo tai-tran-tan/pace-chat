@@ -23,7 +23,7 @@ internal class StargateRestDataSource @Inject constructor(
     @Inject private val client: WebClient,
     @Inject private val configuration: Configuration
 ) : DataSource {
-    private val baseUri = configuration.database.sgBaseUrl
+    private val baseUri = configuration.database.baseUrl
     override suspend fun addUser(user: User): User {
         val res = client.postAbs("$baseUri/users")
             .sendWithAuthToken(user).coAwait()
@@ -194,11 +194,11 @@ internal class StargateRestDataSource @Inject constructor(
     )
 
     private fun HttpRequest<*>.sendWithAuthToken(body: Any? = null): Future<out HttpResponse<out Any?>> {
-        putHeader("X-Cassandra-Token", configuration.database.sgAuthToken)
+        putHeader("X-Cassandra-Token", configuration.sgAuth.token)
         val res = if (body != null) sendJson(JsonObject.mapFrom(body)) else send()
         return res.onComplete { ar ->
                 logger.info {
-                    "${this@sendWithAuthToken.method()} ${this@sendWithAuthToken.uri()} " + ar.result().bodyAsString()
+                    ("${this@sendWithAuthToken.method()} ${this@sendWithAuthToken.uri()} " + ar.result()?.bodyAsString()) ?: "<empty response>"
                 }
             }
             .onFailure {

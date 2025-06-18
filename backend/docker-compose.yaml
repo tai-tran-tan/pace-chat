@@ -1,4 +1,3 @@
-version: "3.3"
 networks:
   cassandra-pace:
     driver: bridge
@@ -14,7 +13,7 @@ services:
     environment:
       - CASSANDRA_CLUSTER_NAME=pace-cluster
     volumes:
-      - cassandra-pace:/var/lib/cassandra:rw
+      - ./database/cassandra:/var/lib/cassandra:rw
     restart:
       on-failure
     healthcheck:

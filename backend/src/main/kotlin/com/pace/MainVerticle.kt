@@ -7,6 +7,7 @@ import com.pace.data.db.DbAccessible
 import com.pace.data.db.impl.CommonDbService
 import com.pace.data.storage.DataSource
 import com.pace.injection.module.BasicGuiceModule
+import com.pace.injection.module.ConfigurationModule
 import com.pace.router.AuthRouter
 import com.pace.router.ConversationRouter
 import com.pace.router.MessageRouter
@@ -27,21 +28,27 @@ import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.CorsHandler
 import io.vertx.ext.web.handler.JWTAuthHandler
+import io.vertx.kotlin.coroutines.dispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 class MainVerticle : AbstractVerticle() {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
     private var jwtService: JwtService = JwtService()
     private lateinit var db: DbAccessible
-    private val injector by lazy { Guice.createInjector(BasicGuiceModule(vertx)) }
 
     override fun start() {
-        ConfigurationService.getConfig(vertx).onSuccess { conf ->
-            val srcClass = conf.database.let { Class.forName(it.dataSourceClass) }
-            db = CommonDbService(
-                injector.getInstance(srcClass) as DataSource
-            )
-            bootstrap(conf.application)
+        CoroutineScope(vertx.dispatcher()).launch {
+            ConfigurationService.getConfig(vertx).onSuccess { conf ->
+                val injector = Guice.createInjector(BasicGuiceModule(vertx))
+                    .createChildInjector(ConfigurationModule(conf))
+                val srcClass = conf.database.let { Class.forName(it.dataSourceClass) }
+                db = CommonDbService(
+                    injector.getInstance(srcClass) as DataSource
+                )
+                bootstrap(conf.application)
+            }
         }
     }
 
