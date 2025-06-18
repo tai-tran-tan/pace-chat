@@ -28,7 +28,7 @@ class ApiService {
   }> = [];
 
   constructor() {
-    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1';
     this.isDevelopment = process.env.NODE_ENV === 'development';
     
     // Create main API instance
