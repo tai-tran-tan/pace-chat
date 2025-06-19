@@ -107,10 +107,24 @@ data class Conversation(
     var lastMessageTimestamp: Instant?,
     var unreadCount: Int // Simplified, backend might not actually calculate this
 ) {
+    fun toConversationResponse(p: List<UserPublic> = emptyList()) =
+        ConversationResponse(conversationId, type, name, p, lastMessagePreview, lastMessageTimestamp, unreadCount)
     fun toUpdateRequestBody() = JsonObject.mapFrom(this).apply {
         remove("conversation_id")
     }
 }
+
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
+data class ConversationResponse(
+    val conversationId: String,
+    val type: String, // "private" or "group"
+    var name: String?, // For group chats, null for private
+    var participants: List<UserPublic>, // List of participants with public info
+    var lastMessagePreview: String?,
+    @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
+    var lastMessageTimestamp: Instant?,
+    var unreadCount: Int // Simplified, backend might not actually calculate this
+)
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class ConversationPrivateRequest @JsonCreator constructor(

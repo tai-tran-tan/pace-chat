@@ -183,6 +183,18 @@ internal class StargateRestDataSource @Inject constructor(
             .deserialize<SgResponseWrapper<Message>>().data
     }
 
+    override suspend fun findUserByIds(userIds: List<String>): List<User> {
+        val res = client.getAbs(
+            "$baseUri/users?where=" + """
+                {
+                    "user_id":{"${'$'}in":${userIds.toJsonString()}}
+                }
+            """.trimIndent().urlEncode()
+        ).sendWithAuthToken().coAwait()
+            .bodyAsJsonObject().deserialize<SgRowResponse<User>>()
+        return res.data
+    }
+
     private data class SgRowResponse<T : Any> @JsonCreator constructor(
         val count: Int? = null,
         val pageState: String? = null,

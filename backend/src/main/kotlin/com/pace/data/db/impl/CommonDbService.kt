@@ -22,6 +22,10 @@ internal class CommonDbService(
         }
     }
 
+    override suspend fun findUserByIds(userIds: List<String>): List<User> {
+        return storage.findUserByIds(userIds)
+    }
+
     override suspend fun authenticateUser(username: String, password: String): User? {
         return storage.authenticate(username, password)
     }

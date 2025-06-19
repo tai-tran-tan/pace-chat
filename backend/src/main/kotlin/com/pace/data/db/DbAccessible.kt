@@ -32,4 +32,5 @@ interface DbAccessible {
     suspend fun findUserById(userId: String): User?
     suspend fun authenticateUser(username: String, password: String): User?
     suspend fun registerUser(user: User): User
+    suspend fun findUserByIds(userIds: List<String>): List<User>
 }

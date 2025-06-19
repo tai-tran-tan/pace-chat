@@ -18,9 +18,11 @@ class UserRouter(private val router: Router, private val db: DbAccessible) {
             val userId = rc.get<String>("userId")
             val user = db.findUserById(userId)
             if (user != null) {
-                rc.response().setStatusCode(200).end(user.toUserResponse().toJsonString())
+                rc.response().setStatusCode(200)
+                    .end(user.toUserResponse().toJsonString())
             } else {
-                rc.response().setStatusCode(404).end(mapOf("message" to "User not found").toJsonString())
+                rc.response().setStatusCode(404)
+                    .end(mapOf("message" to "User not found").toJsonString())
             }
         }
 

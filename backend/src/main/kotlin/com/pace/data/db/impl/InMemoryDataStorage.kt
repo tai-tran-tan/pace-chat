@@ -216,6 +216,10 @@ internal class InMemoryDataStorage : DataSource {
         return message // no action due to ref-modification
     }
 
+    override suspend fun findUserByIds(userIds: List<String>): List<User> {
+        return users.filter { (k, _) -> userIds.contains(k) }.values.toList()
+    }
+
     // --- Message Operations ---
     override suspend fun getMessagesForConversation(conversationId: String, limit: Int, beforeMessageId: String?): List<Message> {
         var filteredMessages = messages.filter { it.conversationId == conversationId }

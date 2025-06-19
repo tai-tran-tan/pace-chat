@@ -23,4 +23,5 @@ interface DataSource {
     suspend fun updateUser(user: User): User
     suspend fun updateConversation(conv: Conversation): Conversation
     suspend fun updateMessage(message: Message): Message
+    suspend fun findUserByIds(userIds: List<String>): List<User>
 }
