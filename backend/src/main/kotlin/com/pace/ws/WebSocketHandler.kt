@@ -56,6 +56,13 @@ class WebSocketHandler(
                 val parsedMessage = JsonObject(messageText)
                 val eventType = parsedMessage.getString("type").let { WsMessage.EventType.valueOf(it) }
 
+                if (eventType == WsMessage.EventType.PING) {
+                    ws.writeTextMessage(mapOf(
+                        "type" to WsMessage.EventType.PONG,
+                        "message" to "Alive!"
+                    ).toJsonString())
+                    return@handler
+                }
                 if (eventType == WsMessage.EventType.AUTH) {
                     if (authenticatedUserId != null) {
                         ws.writeTextMessage(WsMessage.WsAuthFailure(reason = "Already authenticated.").toJsonString())

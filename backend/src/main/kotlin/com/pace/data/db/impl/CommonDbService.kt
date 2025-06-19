@@ -179,8 +179,7 @@ internal class CommonDbService(
         val allMessages = storage.getMessagesForConversation(conversationId, beforeMessageId = oldestMessageId)
             .sortedBy { it.timestamp }
 
-        val index = allMessages.indexOfFirst { it.messageId == oldestMessageId }
-        return index > 0 // If index is > 0, there are messages before it
+        return allMessages.any { it.messageId == oldestMessageId }
     }
 
     override suspend fun addMessage(

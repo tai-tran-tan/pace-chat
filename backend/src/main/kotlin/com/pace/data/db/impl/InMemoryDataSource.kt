@@ -10,7 +10,7 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
-internal class InMemoryDataStorage : DataSource {
+internal class InMemoryDataSource : DataSource {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     // Using ConcurrentHashMap for map-like data structures that might be modified concurrently
@@ -223,7 +223,7 @@ internal class InMemoryDataStorage : DataSource {
     // --- Message Operations ---
     override suspend fun getMessagesForConversation(conversationId: String, limit: Int, beforeMessageId: String?): List<Message> {
         var filteredMessages = messages.filter { it.conversationId == conversationId }
-            .sortedBy { it.timestamp } // Ensure sorted by timestamp ascending
+            .sortedByDescending { it.timestamp } // Ensure sorted by timestamp descending
 
         if (beforeMessageId != null) {
             val index = filteredMessages.indexOfFirst { it.messageId == beforeMessageId }

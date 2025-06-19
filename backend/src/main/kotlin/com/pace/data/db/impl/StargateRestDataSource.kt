@@ -177,8 +177,6 @@ internal class StargateRestDataSource @Inject constructor(
             .bodyAsJsonObject().apply {
                 getJsonObject("data")
                     ?.put("message_id", message.messageId) // add again for deserialization
-//                    ?.put("conversation_id", message.conversationId) // add again for deserialization
-//                    ?.put("timestamp", message.timestamp) // add again for deserialization
             }
             .deserialize<SgResponseWrapper<Message>>().data
     }

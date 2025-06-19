@@ -28,7 +28,7 @@ data class User(
 ) {
     fun toUserPublic() = UserPublic(userId, username, avatarUrl)
     fun toUserResponse() = UserResponse(userId, username, email, status, avatarUrl, lastSeen)
-    fun toUpdateRequestBody() = JsonObject.mapFrom(this).apply {
+    fun toUpdateRequestBody(): JsonObject = JsonObject.mapFrom(this).apply {
         remove("user_id")
     }
 }
@@ -293,7 +293,8 @@ sealed class WsMessage {
         AUTH_FAILURE,
         AUTH_SUCCESS,
         AUTH,
-        PING
+        PING,
+        PONG
     }
 
     enum class UserStatus {
