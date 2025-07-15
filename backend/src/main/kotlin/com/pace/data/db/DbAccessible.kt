@@ -1,5 +1,6 @@
 package com.pace.data.db
 
+import com.pace.data.db.impl.KeycloakDataSource
 import com.pace.data.model.Conversation
 import com.pace.data.model.Message
 import com.pace.data.model.User
@@ -30,7 +31,9 @@ interface DbAccessible {
     suspend fun searchUsers(query: String): List<User>
     suspend fun findUserByEmail(email: String): User?
     suspend fun findUserById(userId: String): User?
-    suspend fun authenticateUser(username: String, password: String): User?
+    suspend fun authenticateUser(username: String, password: String): KeycloakDataSource.AuthenticationResponse?
     suspend fun registerUser(user: User): User
     suspend fun findUserByIds(userIds: List<String>): List<User>
+    suspend fun refreshToken(refreshToken: String): KeycloakDataSource.AuthenticationResponse?
+    suspend fun getUserInfo(token: String): User?
 }

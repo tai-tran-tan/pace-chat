@@ -10,7 +10,7 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming
 data class Configuration @JsonCreator constructor(
     val database: DatabaseConfiguration,
     val application: ApplicationConfiguration,
-    val sgAuth: SgAuth,
+    val authService: AuthService,
 )
 
 @JsonNaming(PropertyNamingStrategies.KebabCaseStrategy::class)
@@ -26,9 +26,10 @@ data class ApplicationConfiguration @JsonCreator constructor(
 )
 
 @JsonNaming(PropertyNamingStrategies.KebabCaseStrategy::class)
-data class SgAuth @JsonCreator constructor(
+data class AuthService @JsonCreator constructor(
     val baseUrl: String,
-    val token: String,
-    val username: String,
-    val password: String,
+    val realmName: String,
+    val clientId: String,
+    val clientSecret: String,
+    val accessToken: String,
 )

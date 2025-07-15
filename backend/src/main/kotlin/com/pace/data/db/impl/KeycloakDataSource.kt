@@ -1,6 +1,9 @@
 package com.pace.data.db.impl
 
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.google.inject.Inject
 import com.pace.config.Configuration
 import com.pace.data.model.Conversation
@@ -12,6 +15,8 @@ import com.pace.utility.deserialize
 import com.pace.utility.toJsonString
 import io.klogging.java.LoggerFactory
 import io.vertx.core.Future
+import io.vertx.core.MultiMap
+import io.vertx.core.http.impl.headers.HeadersMultiMap
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpRequest
 import io.vertx.ext.web.client.HttpResponse
@@ -19,24 +24,60 @@ import io.vertx.ext.web.client.WebClient
 import io.vertx.kotlin.coroutines.coAwait
 import java.net.URLEncoder
 
-internal class StargateRestDataSource @Inject constructor(
+
+class KeycloakDataSource @Inject constructor(
     @Inject private val client: WebClient,
     @Inject private val configuration: Configuration
 ) : DataSource {
-    private val baseUri = configuration.database.baseUrl
+    private val baseUri = configuration.authService.baseUrl
+    private val baseUriUser = "$baseUri/realms/${configuration.authService.realmName}"
+    private val baseUriAdmin = "$baseUri/admin/realms/${configuration.authService.realmName}"
+
     override suspend fun addUser(user: User): User {
         val res = client.postAbs("$baseUri/users")
             .sendWithAuthToken(user).coAwait()
         return res.bodyAsJsonObject()
-            .also { logger.info { it } }
             .deserialize<User>()
     }
 
-    override suspend fun authenticate(username: String, password: String): User? {
-        val u = findUserByUsername(username)
-        return u?.takeIf { u ->
-            u.password == password
-        }
+    override suspend fun getUserInfo(token: String): User? {
+        return client.getAbs("$baseUriUser/protocol/openid-connect/userinfo")
+            .putHeader("Authorization", token)
+            .sendWithLog()
+            .coAwait()
+            .takeIf { it.statusCode() == 200 }
+            ?.bodyAsJsonObject()
+            ?.deserialize<User>()
+    }
+
+    override suspend fun authenticate(username: String, password: String): AuthenticationResponse? {
+        return client.postAbs("$baseUriUser/protocol/openid-connect/token")
+            .sendWithLog(
+                HeadersMultiMap()
+                    .add("grant_type", "password")
+                    .add("client_id", configuration.authService.clientId)
+                    .add("username", username)
+                    .add("password", password)
+                    .add("scope", "openid profile_full")
+                    .add("client_secret", configuration.authService.clientSecret)
+            ).coAwait()
+            .takeIf { it.statusCode() == 200 }
+            ?.bodyAsJsonObject()
+            ?.deserialize<AuthenticationResponse>()
+    }
+
+    override suspend fun refreshToken(refreshToken: String): AuthenticationResponse? {
+        return client.postAbs("$baseUriUser/protocol/openid-connect/token")
+            .sendWithLog(
+                HeadersMultiMap()
+                    .add("grant_type", "refresh_token")
+                    .add("client_id", configuration.authService.clientId)
+                    .add("refresh_token", refreshToken)
+                    .add("client_secret", configuration.authService.clientSecret)
+            ).coAwait()
+            .takeIf { it.statusCode() == 200 }
+            ?.bodyAsJsonObject()
+            ?.deserialize<AuthenticationResponse>()
     }
 
     override suspend fun findUserById(userId: String): User? {
@@ -88,16 +129,17 @@ internal class StargateRestDataSource @Inject constructor(
     }
 
     override suspend fun getConversationsForUser(userId: String): List<Conversation> {
-        val conversations = requireNotNull(findUserById(userId)) { "Nonexistent UserId supplied!" }.conversations
-        val res = client.getAbs(
-            "$baseUri/conversations?where=" +
-                    """
-                    {"conversation_id":{"${'$'}in": ${conversations.toJsonString()}} }
-                """.trimIndent().urlEncode()
-        )
-            .sendWithAuthToken().coAwait()
-            .bodyAsJsonObject().deserialize<SgRowResponse<Conversation>>()
-        return res.data
+        return emptyList()
+//        val conversations = requireNotNull(findUserById(userId)) { "Nonexistent UserId supplied!" }.conversations
+//        val res = client.getAbs(
+//            "$baseUri/conversations?where=" +
+//                    """
+//                    {"conversation_id":{"${'$'}in": ${conversations.toJsonString()}} }
+//                """.trimIndent().urlEncode()
+//        )
+//            .sendWithAuthToken().coAwait()
+//            .bodyAsJsonObject().deserialize<SgRowResponse<Conversation>>()
+//        return res.data
     }
 
     override suspend fun findConversationById(conversationId: String): Conversation? {
@@ -126,16 +168,18 @@ internal class StargateRestDataSource @Inject constructor(
         limit: Int,
         beforeMessageId: String?
     ): List<Message> {
-        val res = client.getAbs("$baseUri/messages?where="
-            + """
+        val res = client.getAbs(
+            "$baseUri/messages?where="
+                    + """
                  {"conversation_id":{"${'$'}eq": "$conversationId"}}
-            """.trimIndent().urlEncode())
+            """.trimIndent().urlEncode()
+        )
             .addQueryParam("page-size", "$limit")
-            .addQueryParam("timestamp", "DESC")
+            .addQueryParam("timestamp", "DESC") // get latest messages
             .sendWithAuthToken().coAwait()
             .bodyAsJsonObject()
             .deserialize<SgRowResponse<Message>>()
-        return res.data
+        return res.data.sortedBy { it.timestamp } // ASC order
     }
 
     override suspend fun addMessage(newMessage: Message): Message {
@@ -193,6 +237,17 @@ internal class StargateRestDataSource @Inject constructor(
         return res.data
     }
 
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class AuthenticationResponse(
+        val accessToken: String,
+        val expiresIn: Long,
+        val refreshToken: String,
+        val refreshExpiresIn: Long,
+        val tokenType: String,
+        val idToken: String,
+    )
+
     private data class SgRowResponse<T : Any> @JsonCreator constructor(
         val count: Int? = null,
         val pageState: String? = null,
@@ -204,20 +259,31 @@ internal class StargateRestDataSource @Inject constructor(
     )
 
     private fun HttpRequest<*>.sendWithAuthToken(body: Any? = null): Future<out HttpResponse<out Any?>> {
-        putHeader("X-Cassandra-Token", configuration.sgAuth.token)
-        val res = if (body != null) sendJson(JsonObject.mapFrom(body)) else send()
+        bearerTokenAuthentication(configuration.authService.accessToken)
+        return sendWithLog(body)
+    }
+
+    private fun HttpRequest<*>.sendWithLog(body: Any? = null): Future<out HttpResponse<out Any?>> {
+        val req = this
+        val res = when (body) {
+            null -> send()
+            is MultiMap -> sendForm(body)
+            else -> sendJson(JsonObject.mapFrom(body))
+        }
         return res.onComplete { ar ->
-                logger.info {
-                    ("${this@sendWithAuthToken.method()} ${this@sendWithAuthToken.uri()} " + ar.result()?.bodyAsString()) ?: "<empty response>"
-                }
+            logger.info {
+                val response = ar.result()
+                "${response?.statusCode()} ${req.method()} ${req.uri()} " +
+                        (response?.bodyAsString() ?: "<empty response>")
             }
+        }
             .onFailure {
                 logger.error(it) {
-                    "${this@sendWithAuthToken.method()} ${this@sendWithAuthToken.uri()} FAILED"
+                    "${req.method()} ${req.uri()} FAILED"
                 }
             }
     }
 }
 
 private fun String.urlEncode() = URLEncoder.encode(this, Charsets.UTF_8)
-private val logger = LoggerFactory.getLogger(StargateRestDataSource::class.java)
+private val logger = LoggerFactory.getLogger(KeycloakDataSource::class.java)

@@ -3,6 +3,7 @@ package com.pace.data.model
 
 //import kotlinx.serialization.SerialName
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
@@ -14,14 +15,16 @@ import java.time.Instant
 import java.util.UUID
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class User(
+    @JsonProperty("sub")
     val userId: String = UUID.randomUUID().toString(),
+    @JsonProperty("preferred_username")
     var username: String,
-    var email: String,
+    var email: String?,
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-    val password: String, // In a real app, this should be hashed and not returned
-    var status: String, // online, offline, away
-    val conversations: MutableList<String> = mutableListOf(),
+    val password: String?, // In a real app, this should be hashed and not returned
+    var status: String?, // online, offline, away
     var avatarUrl: String?,
     @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
     var lastSeen: Instant?
@@ -44,8 +47,8 @@ data class UserPublic(
 data class UserResponse(
     val userId: String,
     val username: String,
-    val email: String,
-    val status: String,
+    val email: String?,
+    val status: String?,
     val avatarUrl: String?,
     @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
     val lastSeen: Instant?
@@ -77,7 +80,6 @@ data class AuthRegisterResponse(
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class AuthLoginRequest (
     val username: String,
-    @JsonDeserialize(converter = ValueToHashConverter::class)
     val password: String
 )
 
@@ -85,15 +87,14 @@ data class AuthLoginRequest (
 data class AuthLoginResponse(
     val userId: String,
     val username: String,
-    val token: String,
-    val refreshToken: String
+    val accessToken: String,
+    val expiresIn: Long,
+    val refreshToken: String,
+    val refreshExpiresIn: Long
 )
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class RefreshTokenRequest(val refreshToken: String)
-
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-data class RefreshTokenResponse(val token: String)
 
 // --- Conversation Models ---
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)

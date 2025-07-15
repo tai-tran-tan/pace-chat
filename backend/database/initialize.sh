@@ -11,7 +11,7 @@ token=$(curl -L -X POST 'http://localhost:8081/v1/auth' \
   --data-raw '{
     "username": "'"$SG_USERNAME"'",
     "password": "'"$SG_PASSWORD"'"
-}' | jq -r '.authToken')
+}' | cut -d: -f2 |cut -d'"' -f2)
 
 if [[ -z "$token"  ]]; then
   echo "Authentication failed"
@@ -34,14 +34,18 @@ curl -X 'POST' \
     "name": "users",
     "primaryKey": {
       "partitionKey": [
-        "user_id"
+        "username", "email"
+      ],
+      "clusteringKey": [
+        "registration_date"
       ]
     },
     "columnDefinitions": [
-      { "name": "user_id", "typeDefinition": "text" },
       { "name": "username", "typeDefinition": "text" },
       { "name": "email", "typeDefinition": "text" },
+      { "name": "display_name", "typeDefinition": "text" },
       { "name": "password", "typeDefinition": "text" },
+      { "name": "registration_date", "typeDefinition": "timestamp" },
       { "name": "conversations", "typeDefinition": "list<text>" },
       { "name": "status", "typeDefinition": "text" },
       { "name": "avatar_url", "typeDefinition": "text" },
@@ -50,25 +54,25 @@ curl -X 'POST' \
     "ifNotExists": true
   }'
 
-curl -X 'POST' \
-  "http://localhost:8082/v2/schemas/keyspaces/$KEYSPACE/tables/users/indexes" \
-  -H 'accept: application/json' \
-  -H 'X-Cassandra-Token: '"$token" \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "column": "username",
-  "ifNotExists": true
-}'
-
-curl -X 'POST' \
-  "http://localhost:8082/v2/schemas/keyspaces/$KEYSPACE/tables/users/indexes" \
-  -H 'accept: application/json' \
-  -H 'X-Cassandra-Token: '"$token" \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "column": "email",
-  "ifNotExists": true
-}'
+#curl -X 'POST' \
+#  "http://localhost:8082/v2/schemas/keyspaces/$KEYSPACE/tables/users/indexes" \
+#  -H 'accept: application/json' \
+#  -H 'X-Cassandra-Token: '"$token" \
+#  -H 'Content-Type: application/json' \
+#  -d '{
+#  "column": "username",
+#  "ifNotExists": true
+#}'
+#
+#curl -X 'POST' \
+#  "http://localhost:8082/v2/schemas/keyspaces/$KEYSPACE/tables/users/indexes" \
+#  -H 'accept: application/json' \
+#  -H 'X-Cassandra-Token: '"$token" \
+#  -H 'Content-Type: application/json' \
+#  -d '{
+#  "column": "email",
+#  "ifNotExists": true
+#}'
 
 curl -X 'POST' \
     "http://localhost:8082/v2/schemas/keyspaces/$KEYSPACE/tables" \
@@ -154,30 +158,36 @@ curl -X 'POST' \
   -H 'accept: application/json' \
   -H 'X-Cassandra-Token: '"$token" \
   -H 'Content-Type: application/json' \
-  -d '{"user_id":"b1c2d3e4-f5a6-7890-1234-567890a",
-  "username":"bob","email":"bob@example.com","password":"ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f",
+  -d '{"username":"bob","email":"bob@example.com",
+  "password":"ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f",
   "conversations":["conv-group-devs", "conv-private-alice-bob"],
-  "status":"offline","avatar_url":"https://placehold.co/50x50/00ff00/ffffff?text=B","last_seen":"2025-06-06T14:00:00.0Z"}'
+  "registration_date":"'"$(date -Iseconds)"'",
+  "status":"offline","avatar_url":"https://placehold.co/50x50/00ff00/ffffff?text=B",
+  "last_seen":"2025-06-06T14:00:00.0Z"}'
 
 curl -X 'POST' \
   "http://localhost:8082/v2/keyspaces/$KEYSPACE/users" \
   -H 'accept: application/json' \
   -H 'X-Cassandra-Token: '"$token" \
   -H 'Content-Type: application/json' \
-  -d '{"user_id":"c1d2e3f4-a5b6-7890-1234-567890ab",
-  "username":"charlie","email":"charlie@example.com","password":"ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f",
+  -d '{"username":"charlie","email":"charlie@example.com",
+  "password":"ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f",
   "conversations":["conv-group-devs"],
-  "status":"online","avatar_url":"https://placehold.co/50x50/0000ff/ffffff?text=C","last_seen":null}'
+  "registration_date":"'"$(date -Iseconds)"'",
+  "status":"online","avatar_url":"https://placehold.co/50x50/0000ff/ffffff?text=C",
+  "last_seen":null}'
 
 curl -X 'POST' \
   "http://localhost:8082/v2/keyspaces/$KEYSPACE/users" \
   -H 'accept: application/json' \
   -H 'X-Cassandra-Token: '"$token" \
   -H 'Content-Type: application/json' \
-  -d '{"user_id":"a1b2c3d4-e5f6-7890-1234-567890abc",
-  "username":"alice","email":"alice@example.com","password":"ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f",
+  -d '{"username":"alice","email":"alice@example.com",
+  "password":"ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f",
   "conversations":["conv-group-devs","conv-private-alice-bob"],
-  "status":"online","avatar_url":"https://placehold.co/50x50/ff0000/ffffff?text=A","last_seen":null}'
+  "registration_date":"'"$(date -Iseconds)"'",
+  "status":"online","avatar_url":"https://placehold.co/50x50/ff0000/ffffff?text=A",
+  "last_seen":null}'
 
 curl -X 'POST' \
   "http://localhost:8082/v2/keyspaces/$KEYSPACE/conversations" \

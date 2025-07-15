@@ -20,17 +20,19 @@ import io.klogging.java.LoggerFactory
 import io.vertx.core.AbstractVerticle
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.http.HttpServerOptions
+import io.vertx.core.json.JsonObject
 import io.vertx.ext.auth.JWTOptions
-import io.vertx.ext.auth.PubSecKeyOptions
 import io.vertx.ext.auth.jwt.JWTAuth
 import io.vertx.ext.auth.jwt.JWTAuthOptions
 import io.vertx.ext.web.Router
+import io.vertx.ext.web.client.WebClient
 import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.CorsHandler
 import io.vertx.ext.web.handler.JWTAuthHandler
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+
 
 class MainVerticle : AbstractVerticle() {
 
@@ -53,27 +55,8 @@ class MainVerticle : AbstractVerticle() {
     }
 
     private fun bootstrap(conf: ApplicationConfiguration) {
-        // Configure JWT Auth Provider for Vert.x Web
-        // In a real app, use asymmetric keys or a more robust key store.
-        // For simulation, we'll use a symmetric key directly.
-        val jwtAuthOptions = JWTAuthOptions()
-            .addPubSecKey(
-                PubSecKeyOptions()
-                    .setAlgorithm("HS256")
-                    .setBuffer(JwtConfig.secret)
-            )
-            .setJWTOptions(
-                JWTOptions()
-                    .setExpiresInMinutes(JwtConfig.tokenExpirySeconds.toInt())
-                    .setAlgorithm("HS256")
-                    .setIssuer(JwtConfig.issuer)
-                    .setAudience(listOf(JwtConfig.audience))
-            )
-        val jwtAuthProvider = JWTAuth.create(vertx, jwtAuthOptions)
-
         // Setup HTTP Router
         val router = Router.router(vertx)
-//        router.route().handler { LoggerHandler.create() }
         // CORS Handler (for Flutter Web/Mobile)
         router.route().handler(
             CorsHandler.create()
@@ -88,29 +71,42 @@ class MainVerticle : AbstractVerticle() {
                 .allowCredentials(true)
         )
 
-        // Body Handler to parse request bodies (JSON)
-//        router.route().handler { ctx ->
-//            LoggerHandler.create()
-//        }
         router.route().handler(BodyHandler.create())
-//        router.route().handler(ErrorHandler.create(vertx, true))
         // Public routes
         AuthRouter(router, jwtService, db).setupRoutes()
 
         // Protected routes using JWT authentication
         val protectedRouter = Router.router(vertx)
-        protectedRouter.route().handler(JWTAuthHandler.create(jwtAuthProvider))
-        protectedRouter.route().handler { routingContext ->
-            val user = routingContext.user()
-            if (user != null) {
-                routingContext.put("userId", user.principal().getString("userId"))
-                routingContext.put("username", user.principal().getString("username"))
-                routingContext.next()
-            } else {
-                routingContext.response().setStatusCode(401).end("Unauthorized")
-            }
-        }
 
+        WebClient.create(vertx)
+            .getAbs("http://localhost:8080/realms/pace_chat/protocol/openid-connect/certs")
+            .send()
+            .onSuccess { res ->
+                val keys = res.bodyAsJsonObject().getJsonArray("keys")
+                    .map { it as JsonObject }
+                    .filter { "RS256" == it.getString("alg") }
+
+                val config = JWTAuthOptions()
+                    .setJwks(keys)
+                    .setJWTOptions(
+                        JWTOptions()
+                            .setIssuer(JwtConfig.issuer)
+                            .setAudience(listOf(JwtConfig.audience))
+                    )
+
+                val provider = JWTAuth.create(vertx, JWTAuthOptions(config))
+                protectedRouter.route().handler(JWTAuthHandler.create(provider))
+                protectedRouter.route().handler { routingContext ->
+                    val user = routingContext.user()
+                    if (user != null) {
+                        routingContext.put("userId", user.principal().getString("userId"))
+                        routingContext.put("username", user.principal().getString("username"))
+                        routingContext.next()
+                    } else {
+                        routingContext.response().setStatusCode(401).end("Unauthorized")
+                    }
+                }
+            }
         val connectionsManager = ConnectionsManager(db)
         UserRouter(protectedRouter, db).setupRoutes()
         ConversationRouter(protectedRouter, db, connectionsManager).setupRoutes()

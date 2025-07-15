@@ -15,8 +15,8 @@ class UserRouter(private val router: Router, private val db: DbAccessible) {
 
     fun setupRoutes() {
         router.get("/users/me").handler(BodyHandler.create()).coroutineHandler { rc ->
-            val userId = rc.get<String>("userId")
-            val user = db.findUserById(userId)
+            val token = rc.request().getHeader("Authorization")
+            val user = db.getUserInfo(token)
             if (user != null) {
                 rc.response().setStatusCode(200)
                     .end(user.toUserResponse().toJsonString())

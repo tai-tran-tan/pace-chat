@@ -7,7 +7,6 @@ import com.pace.data.model.AuthLoginResponse
 import com.pace.data.model.AuthRegisterRequest
 import com.pace.data.model.AuthRegisterResponse
 import com.pace.data.model.RefreshTokenRequest
-import com.pace.data.model.RefreshTokenResponse
 import com.pace.data.model.User
 import com.pace.security.JwtService
 import com.pace.utility.toJsonString
@@ -55,14 +54,18 @@ class AuthRouter(private val router: Router, private val jwtService: JwtService,
 
         router.post("/v1/auth/login").handler(BodyHandler.create()).coroutineHandler { rc ->
             val request = rc.bodyAsPojo<AuthLoginRequest>()
-            val user = db.authenticateUser(request.username, request.password)
+            val res = db.authenticateUser(request.username, request.password)
 
-            if (user != null) {
-                val token = jwtService.generateToken(user.userId, user.username)
-                val refreshToken = jwtService.generateRefreshToken(user.userId, user.username)
+            if (res != null) {
+                val token = JwtService().verifyIdToken(res.accessToken)
+                val user = AuthLoginResponse(
+                    token.userId, token.username,
+                    res.accessToken, res.expiresIn,
+                    res.refreshToken, res.refreshExpiresIn
+                )
                 rc.response().setStatusCode(200)
-                    .end(AuthLoginResponse(user.userId, user.username, token, refreshToken).toJsonString())
-                logger.info("User logged in: ${user.username}")
+                    .end(user.toJsonString())
+                logger.info("User logged in: ${request.username}")
             } else {
                 rc.response().setStatusCode(401).end(mapOf("message" to "Invalid credentials").toJsonString())
             }
@@ -70,15 +73,14 @@ class AuthRouter(private val router: Router, private val jwtService: JwtService,
 
         router.post("/v1/auth/refresh-token").handler(BodyHandler.create()).coroutineHandler { rc ->
             val request = rc.bodyAsPojo<RefreshTokenRequest>()
-            try {
-                val decoded = jwtService.verifyRefreshToken(request.refreshToken)
-                val newAccessToken = jwtService.generateToken(decoded.userId, decoded.username)
-                rc.response().setStatusCode(200).end(RefreshTokenResponse(newAccessToken).toJsonString())
-                logger.info("Token refreshed for user: ${decoded.username}.toJsonString()")
-            } catch (e: Exception) {
+            val token = db.refreshToken(request.refreshToken)
+            if (token != null) {
+                rc.response().setStatusCode(200).end(token.toJsonString())
+                logger.info("Token refreshed for user: ${rc.get("userId", "")}")
+            } else {
                 rc.response().setStatusCode(401)
                     .end(mapOf("message" to "Invalid or expired refresh token").toJsonString())
-                logger.warn("Refresh token failed: ${e.message}")
+                logger.warn("Refresh token failed")
             }
         }
     }

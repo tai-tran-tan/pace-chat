@@ -71,7 +71,7 @@ class WebSocketHandler(
                     }
                     val authMessage = messageText.deserialize<WsMessage.WsAuthMessage>()
                     try {
-                        val decoded = jwtService.verifyRefreshToken(authMessage.token)
+                        val decoded = jwtService.verifyIdToken(authMessage.token)
                         authenticatedUserId = decoded.userId
                         authenticatedUsername = decoded.username
 

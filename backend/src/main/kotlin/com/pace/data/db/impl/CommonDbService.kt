@@ -26,8 +26,16 @@ internal class CommonDbService(
         return storage.findUserByIds(userIds)
     }
 
-    override suspend fun authenticateUser(username: String, password: String): User? {
+    override suspend fun authenticateUser(username: String, password: String): KeycloakDataSource.AuthenticationResponse? {
         return storage.authenticate(username, password)
+    }
+
+    override suspend fun refreshToken(refreshToken: String): KeycloakDataSource.AuthenticationResponse? {
+        return storage.refreshToken(refreshToken)
+    }
+
+    override suspend fun getUserInfo(token: String): User? {
+        return storage.getUserInfo(token)
     }
 
     override suspend fun findUserById(userId: String): User? {
@@ -101,8 +109,8 @@ internal class CommonDbService(
             unreadCount = 0
         )
         storage.addConversation(newConv)
-        user1.conversations.add(newConv.conversationId)
-        user2.conversations.add(newConv.conversationId)
+//        user1.conversations.add(newConv.conversationId)
+//        user2.conversations.add(newConv.conversationId)
         storage.updateUser(user1)
         storage.updateUser(user2)
         logger.info("Created private conversation: ${newConv.conversationId}")
@@ -126,7 +134,7 @@ internal class CommonDbService(
         storage.addConversation(newConv)
         participantIds.forEach {
             storage.findUserById(it)!!.apply {
-                conversations.add(newConv.conversationId)
+//                conversations.add(newConv.conversationId)
             }.let { storage.updateUser(it) }
         }
         logger.info("Created group conversation: ${newConv.conversationId}")

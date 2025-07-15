@@ -51,8 +51,11 @@ dependencies {
     implementation("io.vertx:vertx-web:$vertxVersion")
     implementation("io.vertx:vertx-web-client:$vertxVersion")
     implementation("io.vertx:vertx-json-schema:$vertxVersion") // For basic JSON schema if needed
+    implementation("io.vertx:vertx-auth-oauth2:$vertxVersion")
     implementation("io.vertx:vertx-auth-jwt:$vertxVersion") // For JWT authentication
     implementation("com.auth0:java-jwt:4.5.0")
+    implementation("com.auth0:jwks-rsa:0.22.2")
+//    implementation("org.keycloak:keycloak-authz-client:26.0.6") //23.0.7
     // Kotlinx Serialization for JSON (Vert.x doesn't bundle it, we use it directly)
 //    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
