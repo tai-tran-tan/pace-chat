@@ -2,6 +2,7 @@ package com.pace.data.db.impl
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.google.inject.Inject
@@ -11,42 +12,40 @@ import com.pace.data.model.DeviceToken
 import com.pace.data.model.Message
 import com.pace.data.model.User
 import com.pace.data.storage.DataSource
+import com.pace.security.token.KeycloakTokenManager
 import com.pace.utility.deserialize
 import com.pace.utility.toJsonString
 import io.klogging.java.LoggerFactory
-import io.vertx.core.Future
 import io.vertx.core.MultiMap
+import io.vertx.core.Vertx
 import io.vertx.core.http.impl.headers.HeadersMultiMap
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpRequest
-import io.vertx.ext.web.client.HttpResponse
 import io.vertx.ext.web.client.WebClient
 import io.vertx.kotlin.coroutines.coAwait
 import java.net.URLEncoder
+import java.time.Instant
+import java.util.UUID
 
 
 class KeycloakDataSource @Inject constructor(
+    @Inject private val vertx: Vertx,
     @Inject private val client: WebClient,
     @Inject private val configuration: Configuration
 ) : DataSource {
     private val baseUri = configuration.authService.baseUrl
     private val baseUriUser = "$baseUri/realms/${configuration.authService.realmName}"
     private val baseUriAdmin = "$baseUri/admin/realms/${configuration.authService.realmName}"
-
-    override suspend fun addUser(user: User): User {
-        val res = client.postAbs("$baseUri/users")
-            .sendWithAuthToken(user).coAwait()
-        return res.bodyAsJsonObject()
-            .deserialize<User>()
+    private val tokenMngr = KeycloakTokenManager(vertx, configuration.authService)
+    override suspend fun register(user: User) {
+        client.postAbs("$baseUriAdmin/users")
+            .sendWithAuthToken(user.toKeycloakUser())
     }
 
     override suspend fun getUserInfo(token: String): User? {
         return client.getAbs("$baseUriUser/protocol/openid-connect/userinfo")
             .putHeader("Authorization", token)
             .sendWithLog()
-            .coAwait()
-            .takeIf { it.statusCode() == 200 }
-            ?.bodyAsJsonObject()
             ?.deserialize<User>()
     }
 
@@ -60,9 +59,7 @@ class KeycloakDataSource @Inject constructor(
                     .add("password", password)
                     .add("scope", "openid profile_full")
                     .add("client_secret", configuration.authService.clientSecret)
-            ).coAwait()
-            .takeIf { it.statusCode() == 200 }
-            ?.bodyAsJsonObject()
+            )
             ?.deserialize<AuthenticationResponse>()
     }
 
@@ -74,29 +71,25 @@ class KeycloakDataSource @Inject constructor(
                     .add("client_id", configuration.authService.clientId)
                     .add("refresh_token", refreshToken)
                     .add("client_secret", configuration.authService.clientSecret)
-            ).coAwait()
-            .takeIf { it.statusCode() == 200 }
-            ?.bodyAsJsonObject()
+            )
             ?.deserialize<AuthenticationResponse>()
     }
 
     override suspend fun findUserById(userId: String): User? {
-        val res = client.getAbs("$baseUri/users/$userId")
-            .sendWithAuthToken().coAwait()
-            .bodyAsJsonObject().deserialize<SgRowResponse<User>>()
-        return res.data.singleOrNull()
+        return client.getAbs("$baseUriAdmin/users/$userId")
+            .sendWithAuthToken()
+            ?.deserialize<KeycloakUser>()
+            ?.toUser()
     }
 
     override suspend fun findUserByUsername(username: String): User? {
         val res = client.getAbs(
-            "$baseUri/users?where=" + """
-                {
-                    "username":{"${'$'}eq":"$username"}
-                }
-            """.trimIndent().urlEncode()
-        ).sendWithAuthToken().coAwait()
-            .bodyAsJsonObject().deserialize<SgRowResponse<User>>()
-        return res.data.singleOrNull()
+            "$baseUriAdmin/users" +
+                    "?briefRepresentation=false&username=$username&exact=true"
+        ).sendWithAuthToken()
+            ?.deserialize<List<KeycloakUser>>()
+        if (res != null && res.size > 1) throw IllegalStateException("Duplicated username $username !!!")
+        return res?.singleOrNull()?.toUser()
     }
 
     override suspend fun findUserByEmail(email: String): User? {
@@ -107,21 +100,18 @@ class KeycloakDataSource @Inject constructor(
                     "email":{"${'$'}eq":"$email"}
                 }
             """.trimIndent().urlEncode()
-        ).sendWithAuthToken().coAwait()
-            .bodyAsJsonObject().deserialize<SgRowResponse<User>>()
+        ).sendWithAuthToken()!!
+            .deserialize<SgRowResponse<User>>()
         return res.data.singleOrNull()
     }
 
     override suspend fun searchUsers(query: String): List<User> {
         val res = client.getAbs(
-            "$baseUri/users?where=" + """
-                {
-                    "username":{"${'$'}eq":"$query"}
-                }
-            """.trimIndent().urlEncode()
-        ).sendWithAuthToken().coAwait()
-            .bodyAsJsonObject().deserialize<SgRowResponse<User>>()
-        return res.data
+            "$baseUriAdmin/users" +
+                    "?briefRepresentation=true&search=$query&exact=false"
+        ).sendWithAuthToken()
+        ?.deserialize<List<KeycloakUser>>()
+        return res?.map { it.toUser() } ?: emptyList()
     }
 
     override suspend fun addDeviceToken(deviceToken: DeviceToken) {
@@ -144,8 +134,8 @@ class KeycloakDataSource @Inject constructor(
 
     override suspend fun findConversationById(conversationId: String): Conversation? {
         val res = client.getAbs("$baseUri/conversations/$conversationId")
-            .sendWithAuthToken().coAwait()
-            .bodyAsJsonObject().deserialize<SgRowResponse<Conversation>>()
+            .sendWithAuthToken()!!
+            .deserialize<SgRowResponse<Conversation>>()
         return res.data.singleOrNull()
     }
 
@@ -159,8 +149,8 @@ class KeycloakDataSource @Inject constructor(
 
     override suspend fun addConversation(newConv: Conversation): Conversation {
         val res = client.postAbs("$baseUri/conversations")
-            .sendWithAuthToken(newConv).coAwait()
-        return res.bodyAsJsonObject().deserialize<Conversation>()
+            .sendWithAuthToken(newConv)!!
+        return res.deserialize<Conversation>()
     }
 
     override suspend fun getMessagesForConversation(
@@ -176,53 +166,38 @@ class KeycloakDataSource @Inject constructor(
         )
             .addQueryParam("page-size", "$limit")
             .addQueryParam("timestamp", "DESC") // get latest messages
-            .sendWithAuthToken().coAwait()
-            .bodyAsJsonObject()
+            .sendWithAuthToken()!!
             .deserialize<SgRowResponse<Message>>()
         return res.data.sortedBy { it.timestamp } // ASC order
     }
 
     override suspend fun addMessage(newMessage: Message): Message {
         val res = client.postAbs("$baseUri/messages")
-            .sendWithAuthToken(newMessage).coAwait()
-        return res.bodyAsJsonObject().deserialize<Message>()
+            .sendWithAuthToken(newMessage)!!
+        return res.deserialize<Message>()
     }
 
     override suspend fun findMessageByMessageId(messageId: String): Message? {
         val res = client.getAbs("$baseUri/messages/$messageId")
-            .sendWithAuthToken().coAwait()
-            .bodyAsJsonObject().deserialize<SgRowResponse<Message>>()
+            .sendWithAuthToken()!!.deserialize<SgRowResponse<Message>>()
         return res.data.singleOrNull()
     }
 
-    override suspend fun updateUser(user: User): User {
-        return client.patchAbs("$baseUri/users/${user.userId}")
-            .sendWithAuthToken(user.toUpdateRequestBody()).coAwait()
-            .bodyAsJsonObject().apply {
-                getJsonObject("data")
-                    ?.put("user_id", user.userId) // add again for deserialization
-            }
-            .deserialize<SgResponseWrapper<User>>().data
+    override suspend fun updateUser(user: User) {
+        client.putAbs("$baseUriAdmin/users/${user.userId}")
+            .sendWithAuthToken(user.toKeycloakUser())
     }
 
     override suspend fun updateConversation(conv: Conversation): Conversation {
         return client.patchAbs("$baseUri/conversations/${conv.conversationId}")
-            .sendWithAuthToken(conv.toUpdateRequestBody()).coAwait()
-            .bodyAsJsonObject()
-            .apply {
-                getJsonObject("data")
-                    ?.put("conversation_id", conv.conversationId) // add again for deserialization
-            }.deserialize<SgResponseWrapper<Conversation>>().data
+            .sendWithAuthToken(conv.toUpdateRequestBody())!!
+            .deserialize<SgResponseWrapper<Conversation>>().data
     }
 
     override suspend fun updateMessage(message: Message): Message {
         return client.patchAbs("$baseUri/messages/${message.messageId}")
-            .sendWithAuthToken(message.toUpdateRequestBody()).coAwait()
-            .bodyAsJsonObject().apply {
-                getJsonObject("data")
-                    ?.put("message_id", message.messageId) // add again for deserialization
-            }
-            .deserialize<SgResponseWrapper<Message>>().data
+            .sendWithAuthToken(message.toUpdateRequestBody())
+            ?.deserialize<SgResponseWrapper<Message>>()!!.data
     }
 
     override suspend fun findUserByIds(userIds: List<String>): List<User> {
@@ -232,8 +207,7 @@ class KeycloakDataSource @Inject constructor(
                     "user_id":{"${'$'}in":${userIds.toJsonString()}}
                 }
             """.trimIndent().urlEncode()
-        ).sendWithAuthToken().coAwait()
-            .bodyAsJsonObject().deserialize<SgRowResponse<User>>()
+        ).sendWithAuthToken()?.deserialize<SgRowResponse<User>>()!!
         return res.data
     }
 
@@ -248,6 +222,39 @@ class KeycloakDataSource @Inject constructor(
         val idToken: String,
     )
 
+    data class KeycloakCredential(
+        val type: String = "password",
+        val value: String?,
+        val temporary: Boolean = false
+    )
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    data class KeycloakUser(
+        val id: UUID?,
+        var username: String?,
+        var firstName: String?,
+        var lastName: String?,
+        var email: String?,
+        var emailVerified: Boolean?,
+        val attributes: Map<String, String?>?,
+        val credentials: List<KeycloakCredential>?,
+        val enabled: Boolean = true
+    ) {
+        fun toUser() =
+            User(
+                id.toString(),
+                username,
+                firstName,
+                lastName,
+                email,
+                credentials?.firstOrNull { it.type == "password" }?.value,
+                attributes?.get("status"),
+                attributes?.get("avatar_url"),
+                attributes?.get("last_seen")?.let { Instant.parse(it) }
+            )
+    }
+
     private data class SgRowResponse<T : Any> @JsonCreator constructor(
         val count: Int? = null,
         val pageState: String? = null,
@@ -258,12 +265,12 @@ class KeycloakDataSource @Inject constructor(
         val data: T
     )
 
-    private fun HttpRequest<*>.sendWithAuthToken(body: Any? = null): Future<out HttpResponse<out Any?>> {
-        bearerTokenAuthentication(configuration.authService.accessToken)
+    private suspend fun HttpRequest<*>.sendWithAuthToken(body: Any? = null): JsonObject? {
+        bearerTokenAuthentication(tokenMngr.getAccessToken())
         return sendWithLog(body)
     }
 
-    private fun HttpRequest<*>.sendWithLog(body: Any? = null): Future<out HttpResponse<out Any?>> {
+    private suspend fun HttpRequest<*>.sendWithLog(body: Any? = null): JsonObject? {
         val req = this
         val res = when (body) {
             null -> send()
@@ -281,6 +288,12 @@ class KeycloakDataSource @Inject constructor(
                 logger.error(it) {
                     "${req.method()} ${req.uri()} FAILED"
                 }
+            }.coAwait()
+            .takeIf { it.statusCode() < 400 }
+            ?.runCatching { this.bodyAsJsonObject() }
+            ?.getOrElse { err ->
+                logger.error(err) { "Deserialization problem" }
+                null
             }
     }
 }

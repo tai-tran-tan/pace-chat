@@ -65,6 +65,4 @@ class JwtService() {
 
 
     }
-
-    data class DecodedRefreshToken(val userId: String, val username: String)
 }

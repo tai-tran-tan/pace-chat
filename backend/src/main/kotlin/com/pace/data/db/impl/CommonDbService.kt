@@ -4,6 +4,7 @@ import com.pace.data.db.DbAccessible
 import com.pace.data.model.Conversation
 import com.pace.data.model.DeviceToken
 import com.pace.data.model.Message
+import com.pace.data.model.ProfileUpdate
 import com.pace.data.model.User
 import com.pace.data.storage.DataSource
 import io.klogging.java.LoggerFactory
@@ -16,8 +17,8 @@ internal class CommonDbService(
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     // --- User Operations ---
-    override suspend fun registerUser(user: User): User {
-        return storage.addUser(user).also {
+    override suspend fun registerUser(user: User) {
+        storage.register(user).also {
             logger.info("Registered user: ${user.username}")
         }
     }
@@ -56,18 +57,20 @@ internal class CommonDbService(
 
     override suspend fun updateUserProfile(
         userId: String,
-        username: String?,
-        email: String?,
-        avatarUrl: String?
-    ): User? {
-        val user = storage.findUserById(userId)
-        return user?.apply {
-            if (username != null) this.username = username
-            if (email != null) this.email = email
-            if (avatarUrl != null) this.avatarUrl = avatarUrl
-            storage.updateUser(user)
+        update: ProfileUpdate,
+    ) {
+            storage.updateUser(User(
+                userId,
+                null,
+                update.firstName,
+                update.lastName,
+                update.email,
+                null,
+                status = null,
+                avatarUrl = update.avatarUrl,
+                null
+                ))
             logger.info("User $userId profile updated.")
-        }
     }
 
     override suspend fun updateUserStatus(userId: String, status: String, lastSeen: Instant?) {

@@ -30,6 +30,7 @@ object ConfigurationService {
             .addStore(fileStore)
 
         val retriever = ConfigRetriever.create(vertx, options)
+
         retriever.getConfig {
             if (it.failed() || it.result() == null || it.result().isEmpty) {
                 logger.error(it.cause()) { "Failed to get configuration" }

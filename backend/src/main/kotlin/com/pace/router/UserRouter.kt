@@ -13,7 +13,7 @@ class UserRouter(private val router: Router, private val db: DbAccessible) {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    fun setupRoutes() {
+    fun setupRoutes(): Router {
         router.get("/users/me").handler(BodyHandler.create()).coroutineHandler { rc ->
             val token = rc.request().getHeader("Authorization")
             val user = db.getUserInfo(token)
@@ -27,22 +27,17 @@ class UserRouter(private val router: Router, private val db: DbAccessible) {
         }
 
         router.put("/users/me").handler(BodyHandler.create()).coroutineHandler { rc ->
-            val userId = rc.get<String>("userId")
-            val request = rc.bodyAsPojo<ProfileUpdate>()
-            val updatedUser = db.updateUserProfile(
-                userId,
-                request.username,
-                request.email,
-                request.avatarUrl
-            )
-            if (updatedUser != null) {
-                rc.response().setStatusCode(200).end(mapOf("message" to "Profile updated successfully").toJsonString())
+            val userId = rc.user().subject()
+            val update = rc.bodyAsPojo<ProfileUpdate>()
+            try {
+                db.updateUserProfile(userId, update)
+                rc.response().setStatusCode(200)
+                    .end(mapOf("message" to "Profile updated successfully").toJsonString())
                 logger.info("User $userId updated profile.")
-            } else {
-                rc.response().setStatusCode(404).end(mapOf("message" to "User not found").toJsonString())
+            } catch (e: Throwable) {
+                rc.response().setStatusCode(400).end(mapOf("message" to "Update failed").toJsonString())
+                logger.error(e) { "Update failed $userId" }
             }
-        }.failureHandler { ctx ->
-            logger.error(ctx.failure()) { "Update profile failed" }
         }
 
         router.get("/users/search").coroutineHandler { rc ->
@@ -62,5 +57,6 @@ class UserRouter(private val router: Router, private val db: DbAccessible) {
             rc.response().setStatusCode(200).end(mapOf("message" to "Device token registered.").toJsonString())
             logger.info("Device token registered for user: $userId")
         }
+        return router
     }
 }

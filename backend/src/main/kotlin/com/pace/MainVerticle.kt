@@ -1,7 +1,7 @@
 package com.pace
 
 import com.google.inject.Guice
-import com.pace.config.ApplicationConfiguration
+import com.pace.config.Configuration
 import com.pace.config.ConfigurationService
 import com.pace.data.db.DbAccessible
 import com.pace.data.db.impl.CommonDbService
@@ -29,9 +29,6 @@ import io.vertx.ext.web.client.WebClient
 import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.CorsHandler
 import io.vertx.ext.web.handler.JWTAuthHandler
-import io.vertx.kotlin.coroutines.dispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 
 class MainVerticle : AbstractVerticle() {
@@ -41,20 +38,18 @@ class MainVerticle : AbstractVerticle() {
     private lateinit var db: DbAccessible
 
     override fun start() {
-        CoroutineScope(vertx.dispatcher()).launch {
-            ConfigurationService.getConfig(vertx).onSuccess { conf ->
-                val injector = Guice.createInjector(BasicGuiceModule(vertx))
-                    .createChildInjector(ConfigurationModule(conf))
-                val srcClass = conf.database.let { Class.forName(it.dataSourceClass) }
-                db = CommonDbService(
-                    injector.getInstance(srcClass) as DataSource
-                )
-                bootstrap(conf.application)
-            }
+        ConfigurationService.getConfig(vertx).onSuccess { conf ->
+            val injector = Guice.createInjector(BasicGuiceModule(vertx))
+                .createChildInjector(ConfigurationModule(conf))
+            val srcClass = conf.database.let { Class.forName(it.dataSourceClass) }
+            db = CommonDbService(
+                injector.getInstance(srcClass) as DataSource
+            )
+            bootstrap(conf)
         }
     }
 
-    private fun bootstrap(conf: ApplicationConfiguration) {
+    private fun bootstrap(conf: Configuration) {
         // Setup HTTP Router
         val router = Router.router(vertx)
         // CORS Handler (for Flutter Web/Mobile)
@@ -73,13 +68,13 @@ class MainVerticle : AbstractVerticle() {
 
         router.route().handler(BodyHandler.create())
         // Public routes
-        AuthRouter(router, jwtService, db).setupRoutes()
-
+        AuthRouter(router, db).setupRoutes()
+        val connectionsManager = ConnectionsManager(db)
         // Protected routes using JWT authentication
-        val protectedRouter = Router.router(vertx)
 
+        val authConf = conf.authService
         WebClient.create(vertx)
-            .getAbs("http://localhost:8080/realms/pace_chat/protocol/openid-connect/certs")
+            .getAbs("${authConf.baseUrl}/realms/${authConf.realmName}/protocol/openid-connect/certs")
             .send()
             .onSuccess { res ->
                 val keys = res.bodyAsJsonObject().getJsonArray("keys")
@@ -90,44 +85,38 @@ class MainVerticle : AbstractVerticle() {
                     .setJwks(keys)
                     .setJWTOptions(
                         JWTOptions()
-                            .setIssuer(JwtConfig.issuer)
+                            .setIssuer("${authConf.baseUrl}/realms/${authConf.realmName}")
                             .setAudience(listOf(JwtConfig.audience))
                     )
 
                 val provider = JWTAuth.create(vertx, JWTAuthOptions(config))
-                protectedRouter.route().handler(JWTAuthHandler.create(provider))
-                protectedRouter.route().handler { routingContext ->
-                    val user = routingContext.user()
-                    if (user != null) {
-                        routingContext.put("userId", user.principal().getString("userId"))
-                        routingContext.put("username", user.principal().getString("username"))
-                        routingContext.next()
-                    } else {
-                        routingContext.response().setStatusCode(401).end("Unauthorized")
+                router.route("/v1/*")
+                    .handler(JWTAuthHandler.create(provider))
+                    .handler { routingContext ->
+                        if (routingContext.userContext().authenticated()) {
+                            val user = routingContext.user()
+                            routingContext.put("userId", user.principal().getString("userId"))
+                            routingContext.put("username", user.principal().getString("username"))
+                            routingContext.next()
+                        } else {
+                            routingContext.response().setStatusCode(401).end("Unauthorized")
+                        }
                     }
-                }
+                router.route("/v1/*").subRouter(UserRouter(Router.router(vertx), db).setupRoutes())
+                router.route("/v1/*").subRouter(ConversationRouter(Router.router(vertx), db, connectionsManager).setupRoutes())
+                router.route("/v1/*").subRouter(MessageRouter(Router.router(vertx), db).setupRoutes())
             }
-        val connectionsManager = ConnectionsManager(db)
-        UserRouter(protectedRouter, db).setupRoutes()
-        ConversationRouter(protectedRouter, db, connectionsManager).setupRoutes()
-        MessageRouter(protectedRouter, db).setupRoutes()
-
-        router.route("/v1/*").subRouter(protectedRouter) // Mount protected routes under /v1
-
-//        router.route().handler { ctx ->
-//            if (ctx.failure() != null) logger.error(ctx.failure())
-//        }
-
+            .onFailure { logger.error(it) { "Failed to mount protected paths" } }
         // WebSocket Handler
         val wsHandler = WebSocketHandler(vertx, jwtService, db, connectionsManager)
-
+        val appConf = conf.application
         // Create HTTP server that also handles WebSockets
-        vertx.createHttpServer(HttpServerOptions().setPort(conf.port).setHost(conf.host))
+        vertx.createHttpServer(HttpServerOptions().setPort(appConf.port).setHost(appConf.host))
             .requestHandler(router) // Handle HTTP requests
             .webSocketHandler { wsHandler.handle(it) } // Handle WebSocket connections
-            .listen(conf.port)
+            .listen(appConf.port)
             .onSuccess { http ->
-                logger.info("HTTP and WebSocket server started on http://${conf.host}:${conf.port}")
+                logger.info("HTTP and WebSocket server started on http://${appConf.host}:${appConf.port}")
             }
             .onFailure { err ->
                 logger.error(err) { "Failed to start HTTP/WebSocket server: ${err.message}" }

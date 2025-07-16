@@ -7,7 +7,7 @@ import com.pace.data.model.Message
 import com.pace.data.model.User
 
 interface DataSource {
-    suspend fun addUser(user: User): User
+    suspend fun register(user: User)
     suspend fun authenticate(username: String, password: String): KeycloakDataSource.AuthenticationResponse?
     suspend fun findUserById(userId: String): User?
     suspend fun findUserByUsername(username: String): User?
@@ -21,7 +21,7 @@ interface DataSource {
     suspend fun getMessagesForConversation(conversationId: String, limit: Int = 50, beforeMessageId: String?): List<Message>
     suspend fun addMessage(newMessage: Message): Message
     suspend fun findMessageByMessageId(messageId: String): Message?
-    suspend fun updateUser(user: User): User
+    suspend fun updateUser(user: User)
     suspend fun updateConversation(conv: Conversation): Conversation
     suspend fun updateMessage(message: Message): Message
     suspend fun findUserByIds(userIds: List<String>): List<User>

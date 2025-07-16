@@ -31,5 +31,4 @@ data class AuthService @JsonCreator constructor(
     val realmName: String,
     val clientId: String,
     val clientSecret: String,
-    val accessToken: String,
 )

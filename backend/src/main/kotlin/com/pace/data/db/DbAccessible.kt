@@ -3,6 +3,7 @@ package com.pace.data.db
 import com.pace.data.db.impl.KeycloakDataSource
 import com.pace.data.model.Conversation
 import com.pace.data.model.Message
+import com.pace.data.model.ProfileUpdate
 import com.pace.data.model.User
 import java.time.Instant
 
@@ -27,12 +28,12 @@ interface DbAccessible {
     suspend fun getConversationsForUser(userId: String): List<Conversation>
     suspend fun addDeviceToken(userId: String, deviceToken: String, platform: String)
     suspend fun updateUserStatus(userId: String, status: String, lastSeen: Instant?)
-    suspend fun updateUserProfile(userId: String, username: String?, email: String?, avatarUrl: String?): User?
+    suspend fun updateUserProfile(userId: String, update: ProfileUpdate)
     suspend fun searchUsers(query: String): List<User>
     suspend fun findUserByEmail(email: String): User?
     suspend fun findUserById(userId: String): User?
     suspend fun authenticateUser(username: String, password: String): KeycloakDataSource.AuthenticationResponse?
-    suspend fun registerUser(user: User): User
+    suspend fun registerUser(user: User)
     suspend fun findUserByIds(userIds: List<String>): List<User>
     suspend fun refreshToken(refreshToken: String): KeycloakDataSource.AuthenticationResponse?
     suspend fun getUserInfo(token: String): User?

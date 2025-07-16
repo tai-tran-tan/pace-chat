@@ -8,8 +8,8 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.annotation.JsonNaming
+import com.pace.data.db.impl.KeycloakDataSource
 import com.pace.data.model.deserializer.InstantWithNanoSecondDeserializer
-import com.pace.data.model.deserializer.ValueToHashConverter
 import io.vertx.core.json.JsonObject
 import java.time.Instant
 import java.util.UUID
@@ -20,7 +20,9 @@ data class User(
     @JsonProperty("sub")
     val userId: String = UUID.randomUUID().toString(),
     @JsonProperty("preferred_username")
-    var username: String,
+    var username: String?,
+    val firstName: String?,
+    val lastName: String?,
     var email: String?,
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     val password: String?, // In a real app, this should be hashed and not returned
@@ -29,11 +31,23 @@ data class User(
     @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
     var lastSeen: Instant?
 ) {
-    fun toUserPublic() = UserPublic(userId, username, avatarUrl)
-    fun toUserResponse() = UserResponse(userId, username, email, status, avatarUrl, lastSeen)
-    fun toUpdateRequestBody(): JsonObject = JsonObject.mapFrom(this).apply {
-        remove("user_id")
-    }
+    fun toUserPublic() = UserPublic(userId, requireNotNull(username), avatarUrl)
+    fun toUserResponse() = UserResponse(userId, requireNotNull(username), email, status, avatarUrl, lastSeen)
+
+    fun toKeycloakUser() = KeycloakDataSource.KeycloakUser(
+        UUID.fromString(userId),
+        username,
+        firstName,
+        lastName,
+        email,
+        false,
+        mapOf(
+            "avatar_url" to avatarUrl,
+            "status" to status,
+            "last_seen" to lastSeen?.toString()
+        ).filter { (_, v) -> v != null && v.isNotBlank() },
+        password?.let { listOf(KeycloakDataSource.KeycloakCredential(value = it)) }
+    )
 }
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
@@ -56,7 +70,8 @@ data class UserResponse(
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class ProfileUpdate(
-    val username: String? = null,
+    val firstName: String? = null,
+    val lastName: String? = null,
     val email: String? = null,
     val avatarUrl: String? = null
 )
@@ -66,8 +81,9 @@ data class ProfileUpdate(
 data class AuthRegisterRequest @JsonCreator constructor(
     val username: String,
     val email: String,
-    @JsonDeserialize(converter = ValueToHashConverter::class)
-    val password: String
+    val password: String,
+    val firstName: String?,
+    val lastName: String?,
 )
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)

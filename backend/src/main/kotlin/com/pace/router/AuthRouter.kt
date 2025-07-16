@@ -14,7 +14,7 @@ import io.klogging.java.LoggerFactory
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
 
-class AuthRouter(private val router: Router, private val jwtService: JwtService, private val db: DbAccessible) {
+class AuthRouter(private val router: Router, private val db: DbAccessible) {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -26,14 +26,12 @@ class AuthRouter(private val router: Router, private val jwtService: JwtService,
                 rc.response().setStatusCode(400).end(mapOf("message" to "Username already exists").toJsonString())
                 return@coroutineHandler
             }
-            if (db.findUserByEmail(request.email) != null) {
-                rc.response().setStatusCode(400).end(mapOf("message" to "Email already exists").toJsonString())
-                return@coroutineHandler
-            }
             val newUser = User(
                 username = request.username,
                 email = request.email,
                 password = request.password,
+                firstName = request.firstName,
+                lastName = request.lastName,
                 status = "offline",
                 avatarUrl = "https://placehold.co/50x50/${
                     (0..0xFFFFFF).random().toString(16).padStart(6, '0')
@@ -45,7 +43,7 @@ class AuthRouter(private val router: Router, private val jwtService: JwtService,
             rc.response().setStatusCode(201).end(
                 AuthRegisterResponse(
                     newUser.userId,
-                    newUser.username,
+                    requireNotNull(newUser.username),
                     "User registered successfully"
                 ).toJsonString()
             )

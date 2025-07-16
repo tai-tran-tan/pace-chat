@@ -18,7 +18,7 @@ class ConversationRouter(
 
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    fun setupRoutes() {
+    fun setupRoutes(): Router {
         router.get("/conversations").coroutineHandler { rc ->
             val userId = rc.get<String>("userId")
             val conversations = db.getConversationsForUser(userId)
@@ -157,5 +157,7 @@ class ConversationRouter(
                     .end(mapOf("message" to "Failed to update group participants").toJsonString())
             }
         }
+    return router
     }
+
 }
