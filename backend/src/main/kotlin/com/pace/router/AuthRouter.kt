@@ -1,6 +1,7 @@
 // src/main/kotlin/com/pacechat/router/AuthRouter.kt
 package com.pace.router
 
+import com.fasterxml.jackson.core.JsonProcessingException
 import com.pace.data.db.DbAccessible
 import com.pace.data.model.AuthLoginRequest
 import com.pace.data.model.AuthLoginResponse
@@ -20,10 +21,26 @@ class AuthRouter(private val router: Router, private val db: DbAccessible) {
 
     fun setupRoutes() {
         router.post("/v1/auth/register").handler(BodyHandler.create()).coroutineHandler { rc ->
-            val request = rc.bodyAsPojo<AuthRegisterRequest>()
+            val request = runCatching { rc.bodyAsPojo<AuthRegisterRequest>() }
+                .getOrElse { err ->
+                    when (err) {
+                        is JsonProcessingException -> {
+                            logger.warn(err) { "Failed to parse request!" }
+                            rc.response().setStatusCode(400)
+                                .end(mapOf("message" to "Invalid request body").toJsonString())
+                            return@coroutineHandler
+                        }
+                        else -> {
+                            logger.error(err) { "Failed to parse request!" }
+                            rc.response().setStatusCode(500)
+                                .end(mapOf("message" to "unknown_problem").toJsonString())
+                            return@coroutineHandler
+                        }
+                    }
+                }
 
             if (db.findUserByUsername(request.username) != null) {
-                rc.response().setStatusCode(400).end(mapOf("message" to "Username already exists").toJsonString())
+                rc.response().setStatusCode(409).end(mapOf("message" to "Username already exists").toJsonString())
                 return@coroutineHandler
             }
             val newUser = User(

@@ -18,8 +18,8 @@ import com.pace.utility.toJsonString
 import io.klogging.java.LoggerFactory
 import io.vertx.core.MultiMap
 import io.vertx.core.Vertx
+import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.impl.headers.HeadersMultiMap
-import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.client.HttpRequest
 import io.vertx.ext.web.client.WebClient
 import io.vertx.kotlin.coroutines.coAwait
@@ -108,7 +108,7 @@ class KeycloakDataSource @Inject constructor(
     override suspend fun searchUsers(query: String): List<User> {
         val res = client.getAbs(
             "$baseUriAdmin/users" +
-                    "?briefRepresentation=true&search=$query&exact=false"
+                    "?briefRepresentation=false&search=$query&exact=false"
         ).sendWithAuthToken()
         ?.deserialize<List<KeycloakUser>>()
         return res?.map { it.toUser() } ?: emptyList()
@@ -184,8 +184,19 @@ class KeycloakDataSource @Inject constructor(
     }
 
     override suspend fun updateUser(user: User) {
+        val origin = requireNotNull(findUserById(user.userId)) { "User not found" }
+        val update = origin.copy(
+            username = user.username ?: origin.username,
+            firstName = user.firstName ?: origin.firstName,
+            lastName = user.lastName ?: origin.lastName,
+            email = user.email ?: origin.email,
+            avatarUrl = user.avatarUrl ?: origin.avatarUrl,
+            status = user.status ?: origin.status,
+            lastSeen = user.lastSeen ?: origin.lastSeen
+        )
+
         client.putAbs("$baseUriAdmin/users/${user.userId}")
-            .sendWithAuthToken(user.toKeycloakUser())
+            .sendWithAuthToken(update.toKeycloakUser())
     }
 
     override suspend fun updateConversation(conv: Conversation): Conversation {
@@ -237,7 +248,7 @@ class KeycloakDataSource @Inject constructor(
         var lastName: String?,
         var email: String?,
         var emailVerified: Boolean?,
-        val attributes: Map<String, String?>?,
+        val attributes: Map<String, List<String>?>?,
         val credentials: List<KeycloakCredential>?,
         val enabled: Boolean = true
     ) {
@@ -249,9 +260,9 @@ class KeycloakDataSource @Inject constructor(
                 lastName,
                 email,
                 credentials?.firstOrNull { it.type == "password" }?.value,
-                attributes?.get("status"),
-                attributes?.get("avatar_url"),
-                attributes?.get("last_seen")?.let { Instant.parse(it) }
+                attributes?.get("status")?.firstOrNull(),
+                attributes?.get("avatar_url")?.firstOrNull(),
+                attributes?.get("last_seen")?.firstOrNull()?.let { Instant.parse(it) }
             )
     }
 
@@ -265,17 +276,17 @@ class KeycloakDataSource @Inject constructor(
         val data: T
     )
 
-    private suspend fun HttpRequest<*>.sendWithAuthToken(body: Any? = null): JsonObject? {
+    private suspend fun HttpRequest<*>.sendWithAuthToken(body: Any? = null): Buffer? {
         bearerTokenAuthentication(tokenMngr.getAccessToken())
         return sendWithLog(body)
     }
 
-    private suspend fun HttpRequest<*>.sendWithLog(body: Any? = null): JsonObject? {
+    private suspend fun HttpRequest<*>.sendWithLog(body: Any? = null): Buffer? {
         val req = this
         val res = when (body) {
             null -> send()
             is MultiMap -> sendForm(body)
-            else -> sendJson(JsonObject.mapFrom(body))
+            else -> sendJson(body)
         }
         return res.onComplete { ar ->
             logger.info {
@@ -290,7 +301,7 @@ class KeycloakDataSource @Inject constructor(
                 }
             }.coAwait()
             .takeIf { it.statusCode() < 400 }
-            ?.runCatching { this.bodyAsJsonObject() }
+            ?.runCatching { this.bodyAsBuffer() }
             ?.getOrElse { err ->
                 logger.error(err) { "Deserialization problem" }
                 null

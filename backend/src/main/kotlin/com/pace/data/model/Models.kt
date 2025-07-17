@@ -4,6 +4,7 @@ package com.pace.data.model
 //import kotlinx.serialization.SerialName
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
@@ -40,13 +41,14 @@ data class User(
         firstName,
         lastName,
         email,
-        false,
+        null,
         mapOf(
-            "avatar_url" to avatarUrl,
-            "status" to status,
-            "last_seen" to lastSeen?.toString()
-        ).filter { (_, v) -> v != null && v.isNotBlank() },
-        password?.let { listOf(KeycloakDataSource.KeycloakCredential(value = it)) }
+            "avatar_url" to avatarUrl?.let { listOf(it) },
+            "status" to status?.let { listOf(it) },
+            "last_seen" to lastSeen?.let { listOf(it.toString()) }
+        ).filter { (_, v) -> v != null && v.isNotEmpty() }
+            .takeIf { it.isNotEmpty() },
+        credentials = password?.let { listOf(KeycloakDataSource.KeycloakCredential(value = it)) }
     )
 }
 
@@ -69,6 +71,7 @@ data class UserResponse(
 )
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 data class ProfileUpdate(
     val firstName: String? = null,
     val lastName: String? = null,
@@ -80,10 +83,10 @@ data class ProfileUpdate(
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class AuthRegisterRequest @JsonCreator constructor(
     val username: String,
-    val email: String,
+    val email: String?,
     val password: String,
-    val firstName: String?,
-    val lastName: String?,
+    val firstName: String,
+    val lastName: String,
 )
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
@@ -94,7 +97,7 @@ data class AuthRegisterResponse(
 )
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-data class AuthLoginRequest (
+data class AuthLoginRequest(
     val username: String,
     val password: String
 )
@@ -126,6 +129,7 @@ data class Conversation(
 ) {
     fun toConversationResponse(p: List<UserPublic> = emptyList()) =
         ConversationResponse(conversationId, type, name, p, lastMessagePreview, lastMessageTimestamp, unreadCount)
+
     fun toUpdateRequestBody() = JsonObject.mapFrom(this).apply {
         remove("conversation_id")
     }
@@ -280,6 +284,7 @@ sealed class WsMessage {
         @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
         val readAt: Instant
     ) : WsMessage()
+
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
     data class WsPresenceUpdate(
         override val type: EventType = EventType.PRESENCE_UPDATE,

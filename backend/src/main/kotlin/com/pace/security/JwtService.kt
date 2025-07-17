@@ -5,7 +5,6 @@ import com.auth0.jwk.JwkProviderBuilder
 import com.auth0.jwt.JWT
 import com.auth0.jwt.JWTVerifier
 import com.auth0.jwt.algorithms.Algorithm
-import com.auth0.jwt.interfaces.DecodedJWT
 import com.pace.data.model.UserPublic
 import java.net.URL
 import java.security.interfaces.RSAPublicKey
@@ -23,9 +22,9 @@ class JwtService() {
         )
     }
 
-    fun verifyAccessToken(token: String): DecodedJWT? {
-        return VERIFIER.verify(token)
-    }
+//    fun verifyAccessToken(token: String): DecodedJWT? {
+//        return VERIFIER.verify(token)
+//    }
 
     companion object {
         private val KEYCLOAK_REALM_URL: String = "http://localhost:8080/realms/pace_chat"
@@ -33,7 +32,7 @@ class JwtService() {
         private val issuer = KEYCLOAK_REALM_URL
 
         private val audience = "pace_chat_backend"
-        private val VERIFIER = createVerifier()
+//        private val VERIFIER = createVerifier()
         private fun createVerifier(): JWTVerifier {
             // 1. Build a JwkProvider to fetch and cache Keycloak's public keys
             // This is robust as it handles key rotation and caching.
