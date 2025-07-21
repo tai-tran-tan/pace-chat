@@ -2,5 +2,5 @@
 .idea
 .kotlin
 build
-database/cassandra
+infra/cassandra
 /file-uploads/

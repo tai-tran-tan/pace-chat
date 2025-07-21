@@ -14,8 +14,7 @@ services:
     environment:
       - CASSANDRA_CLUSTER_NAME=pace-cluster
     volumes:
-      - ./database/cassandra:/var/lib/cassandra:rw
-      - ./database/cassandra.yaml:/etc/cassandra/cassandra.yaml
+      - ./infra/cassandra:/var/lib/cassandra:rw
     restart:
       on-failure
     healthcheck:
@@ -27,6 +26,8 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.3.1
     container_name: keycloak_web
+    volumes:
+      - ./infra/keycloak/:/opt/keycloak/data/import
     environment:
       - KC_DB=postgres
       - KC_DB_URL=jdbc:postgresql://postgres-kc:5432/keycloak
@@ -42,7 +43,7 @@ services:
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
 #      - KC_FEATURES=declarative-user-profile
-    command: start-dev
+    command: start-dev --import-realm
 #    healthcheck:
 #      test: "curl -f http://localhost:8080/health/ready"
 #      interval: 5s
