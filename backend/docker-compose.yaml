@@ -42,7 +42,6 @@ services:
       - KC_HEALTH_ENABLED=true
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
-#      - KC_FEATURES=declarative-user-profile
     command: start-dev --import-realm
 #    healthcheck:
 #      test: "curl -f http://localhost:8080/health/ready"
