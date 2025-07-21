@@ -5,13 +5,12 @@ import com.pace.data.db.DbAccessible
 import com.pace.data.model.DeviceToken
 import com.pace.data.model.ProfileUpdate
 import com.pace.utility.toJsonString
-import io.klogging.java.LoggerFactory
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
+import org.apache.logging.log4j.kotlin.logger
+import java.util.UUID
 
 class UserRouter(private val router: Router, private val db: DbAccessible) {
-
-    private val logger = LoggerFactory.getLogger(this::class.java)
 
     fun setupRoutes(): Router {
         router.get("/users/me").handler(BodyHandler.create()).coroutineHandler { rc ->
@@ -27,16 +26,16 @@ class UserRouter(private val router: Router, private val db: DbAccessible) {
         }
 
         router.put("/users/me").handler(BodyHandler.create()).coroutineHandler { rc ->
-            val userId = rc.user().subject()
+            val userId = rc.user().subject().let { UUID.fromString(it) }
             val update = rc.bodyAsPojo<ProfileUpdate>()
             try {
                 db.updateUserProfile(userId, update)
                 rc.response().setStatusCode(200)
                     .end(mapOf("message" to "Profile updated successfully").toJsonString())
-                logger.info("User $userId updated profile.")
+                LOGGER.info("User $userId updated profile.")
             } catch (e: Throwable) {
                 rc.response().setStatusCode(400).end(mapOf("message" to "Update failed").toJsonString())
-                logger.error(e) { "Update failed $userId" }
+                LOGGER.error(e) { "Update failed $userId" }
             }
         }
 
@@ -51,12 +50,16 @@ class UserRouter(private val router: Router, private val db: DbAccessible) {
         }
 
         router.post("/users/me/device-token").handler(BodyHandler.create()).coroutineHandler { rc ->
-            val userId = rc.get<String>("userId")
+            val userId = rc.user().subject().let { UUID.fromString(it) }
             val request = rc.bodyAsPojo<DeviceToken>()
             db.addDeviceToken(userId, request.deviceToken, request.platform)
             rc.response().setStatusCode(200).end(mapOf("message" to "Device token registered.").toJsonString())
-            logger.info("Device token registered for user: $userId")
+            LOGGER.info("Device token registered for user: $userId")
         }
         return router
+    }
+
+    companion object {
+        private val LOGGER = logger()
     }
 }

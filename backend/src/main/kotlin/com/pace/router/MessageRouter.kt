@@ -5,21 +5,19 @@ import com.pace.data.db.DbAccessible
 import com.pace.data.model.FileUploadResponse
 import com.pace.data.model.MessagesHistoryResponse
 import com.pace.utility.toJsonString
-import io.klogging.java.LoggerFactory
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
+import org.apache.logging.log4j.kotlin.logger
 import java.util.UUID
 
 class MessageRouter(private val router: Router, private val db: DbAccessible) {
 
-    private val logger = LoggerFactory.getLogger(this::class.java)
-
     fun setupRoutes(): Router {
         router.get("/conversations/:conversationId/messages").coroutineHandler { rc ->
-            val userId = rc.get<String>("userId")
-            val conversationId = rc.pathParam("conversationId")
+            val userId = rc.user().subject().let { UUID.fromString(it) }
+            val conversationId = rc.pathParam("conversationId").let { UUID.fromString(it) }
             val limit = rc.request().getParam("limit")?.toIntOrNull() ?: 50
-            val beforeMessageId = rc.request().getParam("before_message_id")
+            val beforeMessageId = rc.request().getParam("before_message_id")?.let { UUID.fromString(it) }
 
             val conversation = db.findConversationById(conversationId)
             if (conversation == null || !conversation.participants.any { it == userId }) {
@@ -54,10 +52,13 @@ class MessageRouter(private val router: Router, private val db: DbAccessible) {
                 // Simulate file storage and return a dummy URL
                 val fileUrl = "https://placehold.co/150x150/png?text=UploadedFile&file=${UUID.randomUUID()}_$fileName"
                 rc.response().setStatusCode(201).end(FileUploadResponse(fileUrl, contentType, fileSize).toJsonString())
-                logger.info("Dummy file uploaded: $fileName, size: $fileSize, temp path: ${upload.uploadedFileName()}")
+                LOGGER.info("Dummy file uploaded: $fileName, size: $fileSize, temp path: ${upload.uploadedFileName()}")
 
                 // Cleanup temp file (Vert.x BodyHandler deletes temp files by default after response)
             }
         return router
+    }
+    companion object {
+        private val LOGGER = logger()
     }
 }

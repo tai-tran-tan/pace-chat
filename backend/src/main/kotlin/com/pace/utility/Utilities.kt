@@ -3,6 +3,7 @@ package com.pace.utility
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -33,3 +34,4 @@ fun createObjectMapper(): ObjectMapper =
         .registerModule(JavaTimeModule())
         .configure(JsonParser.Feature.INCLUDE_SOURCE_IN_LOCATION, true)
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+        .setPropertyNamingStrategy(PropertyNamingStrategies.SnakeCaseStrategy.INSTANCE)

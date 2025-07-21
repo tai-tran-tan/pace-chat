@@ -11,13 +11,11 @@ import com.pace.data.model.RefreshTokenRequest
 import com.pace.data.model.User
 import com.pace.security.JwtService
 import com.pace.utility.toJsonString
-import io.klogging.java.LoggerFactory
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
+import org.apache.logging.log4j.kotlin.logger
 
 class AuthRouter(private val router: Router, private val db: DbAccessible) {
-
-    private val logger = LoggerFactory.getLogger(this::class.java)
 
     fun setupRoutes() {
         router.post("/v1/auth/register").handler(BodyHandler.create()).coroutineHandler { rc ->
@@ -25,13 +23,13 @@ class AuthRouter(private val router: Router, private val db: DbAccessible) {
                 .getOrElse { err ->
                     when (err) {
                         is JsonProcessingException -> {
-                            logger.warn(err) { "Failed to parse request!" }
+                            LOGGER.warn(err) { "Failed to parse request!" }
                             rc.response().setStatusCode(400)
                                 .end(mapOf("message" to "Invalid request body").toJsonString())
                             return@coroutineHandler
                         }
                         else -> {
-                            logger.error(err) { "Failed to parse request!" }
+                            LOGGER.error(err) { "Failed to parse request!" }
                             rc.response().setStatusCode(500)
                                 .end(mapOf("message" to "unknown_problem").toJsonString())
                             return@coroutineHandler
@@ -64,7 +62,7 @@ class AuthRouter(private val router: Router, private val db: DbAccessible) {
                     "User registered successfully"
                 ).toJsonString()
             )
-            logger.info("User registered: ${newUser.username}")
+            LOGGER.info("User registered: ${newUser.username}")
         }
 
         router.post("/v1/auth/login").handler(BodyHandler.create()).coroutineHandler { rc ->
@@ -80,7 +78,7 @@ class AuthRouter(private val router: Router, private val db: DbAccessible) {
                 )
                 rc.response().setStatusCode(200)
                     .end(user.toJsonString())
-                logger.info("User logged in: ${request.username}")
+                LOGGER.info("User logged in: ${request.username}")
             } else {
                 rc.response().setStatusCode(401).end(mapOf("message" to "Invalid credentials").toJsonString())
             }
@@ -91,12 +89,16 @@ class AuthRouter(private val router: Router, private val db: DbAccessible) {
             val token = db.refreshToken(request.refreshToken)
             if (token != null) {
                 rc.response().setStatusCode(200).end(token.toJsonString())
-                logger.info("Token refreshed for user: ${rc.get("userId", "")}")
+                LOGGER.info("Token refreshed for user: ${rc.get("userId", "")}")
             } else {
                 rc.response().setStatusCode(401)
                     .end(mapOf("message" to "Invalid or expired refresh token").toJsonString())
-                logger.warn("Refresh token failed")
+                LOGGER.warn("Refresh token failed")
             }
         }
+    }
+
+    companion object {
+        private val LOGGER = logger()
     }
 }

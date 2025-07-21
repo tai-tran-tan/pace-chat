@@ -8,6 +8,7 @@ services:
     container_name: "cassandra-db"
     ports:
       - "7000:7000"
+      - "9042:9042"
     networks:
       - cassandra-pace
     environment:

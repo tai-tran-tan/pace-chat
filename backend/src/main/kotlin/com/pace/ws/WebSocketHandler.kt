@@ -6,13 +6,14 @@ import com.pace.data.model.WsMessage
 import com.pace.security.JwtService
 import com.pace.utility.deserialize
 import com.pace.utility.toJsonString
-import io.klogging.java.LoggerFactory
 import io.vertx.core.http.ServerWebSocket
 import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.apache.logging.log4j.kotlin.logger
 import java.time.Instant
+import java.util.UUID
 
 class WebSocketHandler(
     private val vertx: io.vertx.core.Vertx,
@@ -20,11 +21,10 @@ class WebSocketHandler(
     private val db: DbAccessible,
     private val connectionsManager: ConnectionsManager
 ) {
-    private val logger = LoggerFactory.getLogger(this::class.java)
     fun handle(ws: ServerWebSocket) {
-        logger.info("New WebSocket connection from: ${ws.remoteAddress()}")
+        LOGGER.info("New WebSocket connection from: ${ws.remoteAddress()}")
 
-        var authenticatedUserId: String? = null
+        var authenticatedUserId: UUID? = null
         var authenticatedUsername: String? = null
 
         // Set a handler for when the WebSocket is closed
@@ -43,9 +43,9 @@ class WebSocketHandler(
                         excludeConnection = null
                     )
                 }
-                logger.info("WebSocket for user $authenticatedUsername ($authenticatedUserId) closed.")
+                LOGGER.info("WebSocket for user $authenticatedUsername ($authenticatedUserId) closed.")
             } else {
-                logger.info("Unauthenticated WebSocket closed from: ${ws.remoteAddress()}")
+                LOGGER.info("Unauthenticated WebSocket closed from: ${ws.remoteAddress()}")
             }
         }
 
@@ -93,12 +93,12 @@ class WebSocketHandler(
                         }
 
                         ws.writeTextMessage(WsMessage.WsAuthSuccess(userId = authenticatedUserId).toJsonString())
-                        logger.info("User $authenticatedUsername ($authenticatedUserId) authenticated via WS.")
+                        LOGGER.info("User $authenticatedUsername ($authenticatedUserId) authenticated via WS.")
                     } catch (e: Exception) {
                         ws.writeTextMessage(
                             WsMessage.WsAuthFailure(reason = "Invalid or expired token.").toJsonString()
                         )
-                        logger.error("WebSocket authentication failed: ${e.message}")
+                        LOGGER.error("WebSocket authentication failed: ${e.message}")
                         ws.close() // Close connection on auth failure
                     }
                 } else {
@@ -120,15 +120,12 @@ class WebSocketHandler(
                                     messageData.conversationId,
                                     authenticatedUserId,
                                     messageData.content,
-                                    messageData.messageType,
-                                    messageData.clientMessageId
                                 )
                                 if (newMessage != null) {
                                     // Send MESSAGE_DELIVERED ACK back to the sender
                                     ws.writeTextMessage(
                                         WsMessage.MessageDelivered(
                                             WsMessage.EventType.MESSAGE_DELIVERED,
-                                            messageData.clientMessageId,
                                             newMessage.messageId,
                                             newMessage.timestamp,
                                             "success"
@@ -145,18 +142,17 @@ class WebSocketHandler(
                                             )
                                         }
                                     }
-                                    logger.info("Message sent: ${newMessage.messageId} in ${newMessage.conversationId}")
+                                    LOGGER.info("Message sent: ${newMessage.messageId} in ${newMessage.convId}")
                                 } else {
                                     ws.writeTextMessage(
                                         WsMessage.MessageDelivered(
                                             WsMessage.EventType.MESSAGE_DELIVERED,
-                                            messageData.clientMessageId,
-                                            "N/A", // No server ID on failure
+                                            null, // No server ID on failure
                                             Instant.now(),
                                             "failure"
                                         ).toJsonString()
                                     )
-                                    logger.warn("Failed to add message to DB.")
+                                    LOGGER.warn("Failed to add message to DB.")
                                 }
                             }
                         }
@@ -203,11 +199,11 @@ class WebSocketHandler(
                                     )
                                 }
                             }
-                            logger.info("Read receipt from $authenticatedUsername for conv $conversationId up to $lastReadMessageId")
+                            LOGGER.info("Read receipt from $authenticatedUsername for conv $conversationId up to $lastReadMessageId")
                         }
 
                         else -> {
-                            logger.warn("Unhandled authenticated WebSocket message type: ${eventType}")
+                            LOGGER.warn("Unhandled authenticated WebSocket message type: ${eventType}")
                             ws.writeTextMessage(
 
                                 mapOf(
@@ -219,7 +215,7 @@ class WebSocketHandler(
                     }
                 }
             } catch (e: Exception) {
-                logger.error("Error processing WebSocket message: ${e.message}. Message: $messageText", e)
+                LOGGER.error("Error processing WebSocket message: ${e.message}. Message: $messageText", e)
                 ws.writeTextMessage(
                     mapOf(
                         "type" to "ERROR",
@@ -231,7 +227,7 @@ class WebSocketHandler(
 
         // Set a handler for WebSocket errors
         ws.exceptionHandler { t ->
-            logger.error("WebSocket exception for user ${authenticatedUsername ?: ws.remoteAddress()}: ${t.message}", t)
+            LOGGER.error("WebSocket exception for user ${authenticatedUsername ?: ws.remoteAddress()}: ${t.message}", t)
             if (authenticatedUserId != null) {
                 connectionsManager.removeConnection(authenticatedUserId)
                 CoroutineScope(vertx.dispatcher()).launch {
@@ -247,5 +243,9 @@ class WebSocketHandler(
             }
             ws.close() // Close the connection on error
         }
+    }
+
+    companion object {
+        private val LOGGER = logger()
     }
 }

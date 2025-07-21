@@ -8,6 +8,7 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.pace.data.model.UserPublic
 import java.net.URL
 import java.security.interfaces.RSAPublicKey
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 
@@ -16,7 +17,7 @@ class JwtService() {
     fun verifyIdToken(token: String): UserPublic {
         val decodedJWT = JWT.decode(token)
         return UserPublic(
-            userId = decodedJWT.subject,
+            userId = decodedJWT.subject.let { UUID.fromString(it) },
             username = decodedJWT.getClaim("preferred_username")?.asString() ?: "",
             null
         )

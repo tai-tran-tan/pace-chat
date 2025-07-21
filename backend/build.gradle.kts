@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     kotlin("jvm") version "2.1.20"
+    kotlin("kapt") version "1.9.22"
     application
     id("io.vertx.vertx-plugin") version "1.4.0" // Vert.x Gradle plugin
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23" // Kotlinx Serialization
@@ -62,6 +63,12 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.19.0")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 
+    val datastaxVersion = "4.17.0"
+    implementation("com.datastax.oss:java-driver-core:$datastaxVersion")
+    implementation("com.datastax.oss:java-driver-mapper-runtime:$datastaxVersion")
+    kapt("com.datastax.oss:java-driver-mapper-processor:$datastaxVersion")
+//    implementation("com.datastax.cassandra:cassandra-driver-extras:$datastaxVersion")
+
 
     // Vert.x Kotlin Coroutines
     implementation("io.vertx:vertx-lang-kotlin-coroutines:$vertxVersion")
@@ -69,14 +76,14 @@ dependencies {
 
     implementation("io.vertx:vertx-config:$vertxVersion")
     implementation("io.vertx:vertx-config-hocon:$vertxVersion")
-//    implementation("io.vertx:vertx-config-yaml:$vertxVersion")
 
     implementation("com.google.inject:guice:7.0.0")
 
     // Logging
-//    implementation("ch.qos.logback:logback-classic:1.4.14")
-//    implementation("io.github.microutils:kotlin-logging:3.0.5") // For easy Kotlin logging
-    implementation("io.klogging:klogging-jvm:0.10.1")
+    implementation("org.slf4j:slf4j-api:2.0.13") // Or your desired SLF4J API version
+    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:2.23.1")
+    implementation("org.apache.logging.log4j:log4j-core:2.23.1") // Or the latest version
+    implementation("org.apache.logging.log4j:log4j-api-kotlin:1.3.0") // Or the latest version
 
     // UUID generation (built-in in JVM, but useful to list)
     // No explicit dependency needed for java.util.UUID
@@ -122,4 +129,8 @@ tasks.withType<JavaExec> {
         "--on-redeploy=$doOnChange",
 //        "--java-opts", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000"
     )
+}
+
+tasks.withType<Jar>() {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }

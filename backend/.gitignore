@@ -3,3 +3,4 @@
 .kotlin
 build
 database/cassandra
+/file-uploads/

@@ -16,7 +16,6 @@ import com.pace.security.JwtConfig
 import com.pace.security.JwtService
 import com.pace.ws.ConnectionsManager
 import com.pace.ws.WebSocketHandler
-import io.klogging.java.LoggerFactory
 import io.vertx.core.AbstractVerticle
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.http.HttpServerOptions
@@ -29,11 +28,11 @@ import io.vertx.ext.web.client.WebClient
 import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.CorsHandler
 import io.vertx.ext.web.handler.JWTAuthHandler
+import org.apache.logging.log4j.kotlin.logger
 
 
 class MainVerticle : AbstractVerticle() {
 
-    private val logger = LoggerFactory.getLogger(this::class.java)
     private var jwtService: JwtService = JwtService()
     private lateinit var db: DbAccessible
 
@@ -106,7 +105,7 @@ class MainVerticle : AbstractVerticle() {
                 router.route("/v1/*").subRouter(ConversationRouter(Router.router(vertx), db, connectionsManager).setupRoutes())
                 router.route("/v1/*").subRouter(MessageRouter(Router.router(vertx), db).setupRoutes())
             }
-            .onFailure { logger.error(it) { "Failed to mount protected paths" } }
+            .onFailure { LOGGER.error(it) { "Failed to mount protected paths" } }
         // WebSocket Handler
         val wsHandler = WebSocketHandler(vertx, jwtService, db, connectionsManager)
         val appConf = conf.application
@@ -116,10 +115,14 @@ class MainVerticle : AbstractVerticle() {
             .webSocketHandler { wsHandler.handle(it) } // Handle WebSocket connections
             .listen(appConf.port)
             .onSuccess { http ->
-                logger.info("HTTP and WebSocket server started on http://${appConf.host}:${appConf.port}")
+                LOGGER.info("HTTP and WebSocket server started on http://${appConf.host}:${appConf.port}")
             }
             .onFailure { err ->
-                logger.error(err) { "Failed to start HTTP/WebSocket server: ${err.message}" }
+                LOGGER.error(err) { "Failed to start HTTP/WebSocket server: ${err.message}" }
             }
+    }
+
+    companion object {
+        private val LOGGER = logger()
     }
 }

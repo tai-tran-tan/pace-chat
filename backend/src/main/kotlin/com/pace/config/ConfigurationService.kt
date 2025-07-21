@@ -1,13 +1,13 @@
 package com.pace.config
 
 import com.pace.utility.deserialize
-import io.klogging.java.LoggerFactory
 import io.vertx.config.ConfigRetriever
 import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.config.ConfigStoreOptions
 import io.vertx.core.Future
 import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
+import org.apache.logging.log4j.kotlin.logger
 import java.util.concurrent.atomic.AtomicReference
 
 
@@ -33,16 +33,15 @@ object ConfigurationService {
 
         retriever.getConfig {
             if (it.failed() || it.result() == null || it.result().isEmpty) {
-                logger.error(it.cause()) { "Failed to get configuration" }
-            } else logger.info("Configuration retrieved ")// + it.result())
+                LOGGER.error(it.cause()) { "Failed to get configuration" }
+            } else LOGGER.info("Configuration retrieved ")// + it.result())
         }
         return retriever.config.map { json ->
             json.deserialize<Configuration>()
         }.onFailure {
-            logger.error(it) { "Failed to process configuration" }
+            LOGGER.error(it) { "Failed to process configuration" }
         }
     }
 
+    private val LOGGER = logger()
 }
-
-private val logger = LoggerFactory.getLogger(ConfigurationService::class.java)

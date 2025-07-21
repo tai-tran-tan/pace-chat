@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.google.inject.Inject
 import com.pace.config.Configuration
+import com.pace.data.db.dao.DaoCreator
 import com.pace.data.model.Conversation
 import com.pace.data.model.DeviceToken
 import com.pace.data.model.Message
@@ -14,8 +15,6 @@ import com.pace.data.model.User
 import com.pace.data.storage.DataSource
 import com.pace.security.token.KeycloakTokenManager
 import com.pace.utility.deserialize
-import com.pace.utility.toJsonString
-import io.klogging.java.LoggerFactory
 import io.vertx.core.MultiMap
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
@@ -23,6 +22,11 @@ import io.vertx.core.http.impl.headers.HeadersMultiMap
 import io.vertx.ext.web.client.HttpRequest
 import io.vertx.ext.web.client.WebClient
 import io.vertx.kotlin.coroutines.coAwait
+import io.vertx.kotlin.coroutines.dispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import org.apache.logging.log4j.kotlin.logger
 import java.net.URLEncoder
 import java.time.Instant
 import java.util.UUID
@@ -37,6 +41,7 @@ class KeycloakDataSource @Inject constructor(
     private val baseUriUser = "$baseUri/realms/${configuration.authService.realmName}"
     private val baseUriAdmin = "$baseUri/admin/realms/${configuration.authService.realmName}"
     private val tokenMngr = KeycloakTokenManager(vertx, configuration.authService)
+
     override suspend fun register(user: User) {
         client.postAbs("$baseUriAdmin/users")
             .sendWithAuthToken(user.toKeycloakUser())
@@ -75,7 +80,7 @@ class KeycloakDataSource @Inject constructor(
             ?.deserialize<AuthenticationResponse>()
     }
 
-    override suspend fun findUserById(userId: String): User? {
+    override suspend fun findUserById(userId: UUID): User? {
         return client.getAbs("$baseUriAdmin/users/$userId")
             .sendWithAuthToken()
             ?.deserialize<KeycloakUser>()
@@ -83,8 +88,7 @@ class KeycloakDataSource @Inject constructor(
     }
 
     override suspend fun findUserByUsername(username: String): User? {
-        val res = client.getAbs(
-            "$baseUriAdmin/users" +
+        val res = client.getAbs("$baseUriAdmin/users" +
                     "?briefRepresentation=false&username=$username&exact=true"
         ).sendWithAuthToken()
             ?.deserialize<List<KeycloakUser>>()
@@ -93,24 +97,19 @@ class KeycloakDataSource @Inject constructor(
     }
 
     override suspend fun findUserByEmail(email: String): User? {
-        val res = client.getAbs(
-            "$baseUri/users?where=" +
-                    """
-                {
-                    "email":{"${'$'}eq":"$email"}
-                }
-            """.trimIndent().urlEncode()
-        ).sendWithAuthToken()!!
-            .deserialize<SgRowResponse<User>>()
-        return res.data.singleOrNull()
+        val res = client.getAbs("$baseUriAdmin/users" +
+                    "?briefRepresentation=false&email=$email&exact=true"
+        ).sendWithAuthToken()
+            ?.deserialize<List<KeycloakUser>>()
+        if (res != null && res.size > 1) throw IllegalStateException("Duplicated email $email !!!")
+        return res?.singleOrNull()?.toUser()
     }
 
     override suspend fun searchUsers(query: String): List<User> {
-        val res = client.getAbs(
-            "$baseUriAdmin/users" +
+        val res = client.getAbs("$baseUriAdmin/users" +
                     "?briefRepresentation=false&search=$query&exact=false"
         ).sendWithAuthToken()
-        ?.deserialize<List<KeycloakUser>>()
+            ?.deserialize<List<KeycloakUser>>()
         return res?.map { it.toUser() } ?: emptyList()
     }
 
@@ -118,69 +117,61 @@ class KeycloakDataSource @Inject constructor(
         TODO("Not yet implemented")
     }
 
-    override suspend fun getConversationsForUser(userId: String): List<Conversation> {
-        return emptyList()
-//        val conversations = requireNotNull(findUserById(userId)) { "Nonexistent UserId supplied!" }.conversations
-//        val res = client.getAbs(
-//            "$baseUri/conversations?where=" +
-//                    """
-//                    {"conversation_id":{"${'$'}in": ${conversations.toJsonString()}} }
-//                """.trimIndent().urlEncode()
-//        )
-//            .sendWithAuthToken().coAwait()
-//            .bodyAsJsonObject().deserialize<SgRowResponse<Conversation>>()
-//        return res.data
+    private val conversationDao = DaoCreator.createConversationDao()
+    override suspend fun getConversationsForUser(userId: UUID): List<Conversation> {
+        return conversationDao.findByUser(userId).all()
     }
 
-    override suspend fun findConversationById(conversationId: String): Conversation? {
-        val res = client.getAbs("$baseUri/conversations/$conversationId")
-            .sendWithAuthToken()!!
-            .deserialize<SgRowResponse<Conversation>>()
-        return res.data.singleOrNull()
+    override suspend fun findConversationById(conversationId: UUID): Conversation? {
+        val conversations = conversationDao.findById(conversationId).all()
+            .filter{ it.exitedTime == null } // filter out exited members
+        val participants = conversations
+            .map { it.userId }
+        return conversations.firstOrNull().apply {
+            checkNotNull(this) { "Conversation $conversationId not found!" }
+            this.participants.addAll(participants)
+        }
     }
 
     override suspend fun findPrivateConversation(
-        user1Id: String,
-        user2Id: String
+        user1Id: UUID,
+        user2Id: UUID
     ): Conversation? {
-        val cons = getConversationsForUser(user1Id)
-        return cons.firstOrNull { c -> c.type == "private" && c.participants.any { it == user2Id } }
+        val participants = listOf(user1Id, user2Id)
+        val allPrivate = conversationDao.findByAnyUser(participants).all()
+            .filter { it.type == "private" }
+            .filter{ it.exitedTime == null }
+            .groupBy { it.convId }
+            .also { LOGGER.debug { "Returned ${it.size} conversations" } }
+            .takeIf { it.isNotEmpty() }
+
+        return allPrivate
+            ?.values
+            ?.firstOrNull { v -> v.map{ it.userId }.containsAll(participants) }
+            ?.first()
+            ?.apply {
+                this.participants.addAll(participants)
+            }
     }
 
-    override suspend fun addConversation(newConv: Conversation): Conversation {
-        val res = client.postAbs("$baseUri/conversations")
-            .sendWithAuthToken(newConv)!!
-        return res.deserialize<Conversation>()
+    override suspend fun addConversation(newConv: Conversation) {
+        conversationDao.save(newConv)
     }
 
     override suspend fun getMessagesForConversation(
-        conversationId: String,
+        conversationId: UUID,
         limit: Int,
-        beforeMessageId: String?
+        beforeMessageId: UUID?
     ): List<Message> {
-        val res = client.getAbs(
-            "$baseUri/messages?where="
-                    + """
-                 {"conversation_id":{"${'$'}eq": "$conversationId"}}
-            """.trimIndent().urlEncode()
-        )
-            .addQueryParam("page-size", "$limit")
-            .addQueryParam("timestamp", "DESC") // get latest messages
-            .sendWithAuthToken()!!
-            .deserialize<SgRowResponse<Message>>()
-        return res.data.sortedBy { it.timestamp } // ASC order
+        return messageDao.findByConversation(conversationId).all()
     }
 
-    override suspend fun addMessage(newMessage: Message): Message {
-        val res = client.postAbs("$baseUri/messages")
-            .sendWithAuthToken(newMessage)!!
-        return res.deserialize<Message>()
+    override suspend fun addMessage(newMessage: Message) {
+        messageDao.save(newMessage)
     }
 
-    override suspend fun findMessageByMessageId(messageId: String): Message? {
-        val res = client.getAbs("$baseUri/messages/$messageId")
-            .sendWithAuthToken()!!.deserialize<SgRowResponse<Message>>()
-        return res.data.singleOrNull()
+    override suspend fun findMessageByMessageId(messageId: UUID): Message? {
+       return messageDao.findById(messageId)
     }
 
     override suspend fun updateUser(user: User) {
@@ -199,82 +190,21 @@ class KeycloakDataSource @Inject constructor(
             .sendWithAuthToken(update.toKeycloakUser())
     }
 
-    override suspend fun updateConversation(conv: Conversation): Conversation {
-        return client.patchAbs("$baseUri/conversations/${conv.conversationId}")
-            .sendWithAuthToken(conv.toUpdateRequestBody())!!
-            .deserialize<SgResponseWrapper<Conversation>>().data
+    override suspend fun updateConversation(conv: Conversation) =
+        conversationDao.update(conv)
+
+    private val messageDao = DaoCreator.createMessageDao()
+    override suspend fun updateMessage(message: Message) {
+        messageDao.update(message)
     }
 
-    override suspend fun updateMessage(message: Message): Message {
-        return client.patchAbs("$baseUri/messages/${message.messageId}")
-            .sendWithAuthToken(message.toUpdateRequestBody())
-            ?.deserialize<SgResponseWrapper<Message>>()!!.data
+    override suspend fun findUserByIds(userIds: List<UUID>): List<User> {
+        return userIds.map { id ->
+            CoroutineScope(vertx.dispatcher()).async {
+                requireNotNull(findUserById(id)) { "User not found"}
+            }
+        }.awaitAll()
     }
-
-    override suspend fun findUserByIds(userIds: List<String>): List<User> {
-        val res = client.getAbs(
-            "$baseUri/users?where=" + """
-                {
-                    "user_id":{"${'$'}in":${userIds.toJsonString()}}
-                }
-            """.trimIndent().urlEncode()
-        ).sendWithAuthToken()?.deserialize<SgRowResponse<User>>()!!
-        return res.data
-    }
-
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    data class AuthenticationResponse(
-        val accessToken: String,
-        val expiresIn: Long,
-        val refreshToken: String,
-        val refreshExpiresIn: Long,
-        val tokenType: String,
-        val idToken: String,
-    )
-
-    data class KeycloakCredential(
-        val type: String = "password",
-        val value: String?,
-        val temporary: Boolean = false
-    )
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    data class KeycloakUser(
-        val id: UUID?,
-        var username: String?,
-        var firstName: String?,
-        var lastName: String?,
-        var email: String?,
-        var emailVerified: Boolean?,
-        val attributes: Map<String, List<String>?>?,
-        val credentials: List<KeycloakCredential>?,
-        val enabled: Boolean = true
-    ) {
-        fun toUser() =
-            User(
-                id.toString(),
-                username,
-                firstName,
-                lastName,
-                email,
-                credentials?.firstOrNull { it.type == "password" }?.value,
-                attributes?.get("status")?.firstOrNull(),
-                attributes?.get("avatar_url")?.firstOrNull(),
-                attributes?.get("last_seen")?.firstOrNull()?.let { Instant.parse(it) }
-            )
-    }
-
-    private data class SgRowResponse<T : Any> @JsonCreator constructor(
-        val count: Int? = null,
-        val pageState: String? = null,
-        val data: List<T>
-    )
-
-    private data class SgResponseWrapper<T : Any> @JsonCreator constructor(
-        val data: T
-    )
 
     private suspend fun HttpRequest<*>.sendWithAuthToken(body: Any? = null): Buffer? {
         bearerTokenAuthentication(tokenMngr.getAccessToken())
@@ -289,25 +219,82 @@ class KeycloakDataSource @Inject constructor(
             else -> sendJson(body)
         }
         return res.onComplete { ar ->
-            logger.info {
+            LOGGER.info {
                 val response = ar.result()
                 "${response?.statusCode()} ${req.method()} ${req.uri()} " +
                         (response?.bodyAsString() ?: "<empty response>")
             }
         }
             .onFailure {
-                logger.error(it) {
+                LOGGER.error(it) {
                     "${req.method()} ${req.uri()} FAILED"
                 }
             }.coAwait()
             .takeIf { it.statusCode() < 400 }
             ?.runCatching { this.bodyAsBuffer() }
             ?.getOrElse { err ->
-                logger.error(err) { "Deserialization problem" }
+                LOGGER.error(err) { "Deserialization problem" }
                 null
             }
     }
+
+    companion object {
+        private val LOGGER = logger()
+    }
+}
+private fun String.urlEncode() = URLEncoder.encode(this, Charsets.UTF_8)
+
+
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class AuthenticationResponse(
+    val accessToken: String,
+    val expiresIn: Long,
+    val refreshToken: String,
+    val refreshExpiresIn: Long,
+    val tokenType: String,
+    val idToken: String,
+)
+
+data class KeycloakCredential(
+    val type: String = "password",
+    val value: String?,
+    val temporary: Boolean = false
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class KeycloakUser(
+    val id: UUID?,
+    var username: String?,
+    var firstName: String?,
+    var lastName: String?,
+    var email: String?,
+    var emailVerified: Boolean?,
+    val attributes: Map<String, List<String>?>?,
+    val credentials: List<KeycloakCredential>?,
+    val enabled: Boolean = true
+) {
+    fun toUser() =
+        User(
+            id!!,
+            username,
+            firstName,
+            lastName,
+            email,
+            credentials?.firstOrNull { it.type == "password" }?.value,
+            attributes?.get("status")?.firstOrNull(),
+            attributes?.get("avatar_url")?.firstOrNull(),
+            attributes?.get("last_seen")?.firstOrNull()?.let { Instant.parse(it) }
+        )
 }
 
-private fun String.urlEncode() = URLEncoder.encode(this, Charsets.UTF_8)
-private val logger = LoggerFactory.getLogger(KeycloakDataSource::class.java)
+private data class SgRowResponse<T : Any> @JsonCreator constructor(
+    val count: Int? = null,
+    val pageState: String? = null,
+    val data: List<T>
+)
+
+private data class SgResponseWrapper<T : Any> @JsonCreator constructor(
+    val data: T
+)
