@@ -134,12 +134,13 @@ api.interceptors.response.use(
             refresh_token: refreshToken
           });
           
-          if (response.data.token) {
+          const token = response.data.access_token
+          if (token) {
             console.log('Token refreshed successfully');
-            useAuthStore.getState().setToken(response.data.token);
+            useAuthStore.getState().setToken(token);
             
             const originalRequest = error.config;
-            originalRequest.headers.Authorization = `Bearer ${response.data.token}`;
+            originalRequest.headers.Authorization = `Bearer ${token}`;
             return retryRequest(originalRequest);
           }
         }
@@ -171,7 +172,7 @@ export const authApi = {
         data: {
           user_id: response.data.user_id,
           username: response.data.username,
-          hasToken: !!response.data.token,
+          hasToken: !!response.data.access_token,
           hasRefreshToken: !!response.data.refresh_token
         }
       });

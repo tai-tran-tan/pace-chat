@@ -197,7 +197,6 @@ export default function ChatPage() {
       sender_name: user.username,
       sender_avatar: user.avatar_url || undefined,
       content: input,
-      message_type: 'text',
       timestamp: new Date().toISOString(),
       read_by: [],
     };
@@ -256,7 +255,7 @@ export default function ChatPage() {
       const other = conv.participants.find((p) => p.user_id !== user?.user_id);
       return other?.username || 'Unknown User';
     }
-    return conv.name || 'Group Chat';
+    return conv.title || 'Group Chat';
   };
 
   // Get avatar for conversation

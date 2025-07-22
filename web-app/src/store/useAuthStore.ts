@@ -49,18 +49,19 @@ export const useAuthStore = create<AuthStore>()(
         try {
           const response = await apiService.login({ username, password });
           
+          const data = response.data
           // Check if response has the expected structure
-          if (response.data && response.data.user_id && response.data.token) {
+          if (data && data.user_id && data.access_token) {
             // Create user object from response
             const userData = {
-              user_id: response.data.user_id,
-              username: response.data.username,
-              email: response.data.email || '',
-              avatar_url: response.data.avatar_url || null,
+              user_id: data.user_id,
+              username: data.username,
+              email: data.email || '',
+              avatar_url: data.avatar_url || null,
               status: 'online' as const,
-              last_seen: response.data.last_seen || null,
-              created_at: response.data.created_at || '',
-              updated_at: response.data.updated_at || '',
+              last_seen: data.last_seen || null,
+              created_at: data.created_at || '',
+              updated_at: data.updated_at || '',
             };
             
             set({
@@ -71,7 +72,7 @@ export const useAuthStore = create<AuthStore>()(
             });
             return;
           } else {
-            const errorMessage = response.data.message || 'Login failed';
+            const errorMessage = data.message || 'Login failed';
             set({
               isLoading: false,
               error: errorMessage,
@@ -83,9 +84,9 @@ export const useAuthStore = create<AuthStore>()(
           if (error.response?.status === 401) {
             errorMessage = 'Invalid username or password';
           } else if (error.response?.status === 400) {
-            errorMessage = error.response.data?.message || 'Invalid request';
+            errorMessage = error.data?.message || 'Invalid request';
           } else if (error.response?.data?.message) {
-            errorMessage = error.response.data.message;
+            errorMessage = error.data.message;
           } else if (error.code === 'NETWORK_ERROR') {
             errorMessage = 'Network error. Please check your connection.';
           }
@@ -102,9 +103,10 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
         try {
           const response = await apiService.register({ username, email, password });
-          
+          const data = response.data
+
           // Check if response has the expected structure for register
-          if (response.data && response.data.user_id && response.data.username) {
+          if (data && data.user_id && data.username) {
             // Registration successful, but don't set user as authenticated
             // User needs to login to get tokens
             set({
@@ -113,7 +115,7 @@ export const useAuthStore = create<AuthStore>()(
             });
             return;
           } else {
-            const errorMessage = response.data.message || 'Registration failed';
+            const errorMessage = data.message || 'Registration failed';
             set({
               isLoading: false,
               error: errorMessage,
@@ -125,9 +127,9 @@ export const useAuthStore = create<AuthStore>()(
           if (error.response?.status === 409) {
             errorMessage = 'Username or email already exists';
           } else if (error.response?.status === 400) {
-            errorMessage = error.response.data?.message || 'Invalid request';
+            errorMessage = error.data?.message || 'Invalid request';
           } else if (error.response?.data?.message) {
-            errorMessage = error.response.data.message;
+            errorMessage = error.data.message;
           } else if (error.code === 'NETWORK_ERROR') {
             errorMessage = 'Network error. Please check your connection.';
           }
@@ -172,18 +174,19 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true });
         try {
           const response = await apiService.getCurrentUser();
-          
+          const data = response.data
+
           // Check if response has the expected structure
-          if (response.data && response.data.user_id) {
+          if (data && data.user_id) {
             const userData = {
-              user_id: response.data.user_id,
-              username: response.data.username,
-              email: response.data.email || '',
-              avatar_url: response.data.avatar_url || null,
+              user_id: data.user_id,
+              username: data.username,
+              email: data.email || '',
+              avatar_url: data.avatar_url || null,
               status: 'online' as const,
-              last_seen: response.data.last_seen || null,
-              created_at: response.data.created_at || '',
-              updated_at: response.data.updated_at || '',
+              last_seen: data.last_seen || null,
+              created_at: data.created_at || '',
+              updated_at: data.updated_at || '',
             };
             
             set({

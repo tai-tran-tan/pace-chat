@@ -107,7 +107,7 @@ export const useSearch = () => {
         const searchTerm = query.toLowerCase();
         
         // Search in conversation name (for group chats)
-        if (conversation.name && conversation.name.toLowerCase().includes(searchTerm)) {
+        if (conversation.title && conversation.title.toLowerCase().includes(searchTerm)) {
           return true;
         }
         
@@ -122,7 +122,7 @@ export const useSearch = () => {
       }).map((conversation: Conversation): ConversationSearchResult => ({
         conversation_id: conversation.conversation_id,
         type: conversation.type as 'private' | 'group',
-        name: conversation.name,
+        name: conversation.title,
         participants: conversation.participants.map((participant: ConversationParticipant): UserSearchResult => ({
           user_id: participant.user_id,
           username: participant.username,

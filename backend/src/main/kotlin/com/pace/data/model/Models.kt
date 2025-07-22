@@ -42,13 +42,13 @@ data class User(
     fun toUserResponse() = UserResponse(userId, requireNotNull(username), email, status, avatarUrl, lastSeen)
 
     fun toKeycloakUser() = KeycloakUser(
-        userId,
-        username,
-        firstName,
-        lastName,
-        email,
-        null,
-        mapOf(
+        id = userId,
+        username = username,
+        firstName = firstName,
+        lastName = lastName,
+        email = email,
+        emailVerified = null,
+        attributes = mapOf(
             "avatar_url" to avatarUrl?.let { listOf(it) },
             "status" to status?.let { listOf(it) },
             "last_seen" to lastSeen?.let { listOf(it.toString()) }
@@ -131,6 +131,7 @@ data class Conversation @JvmOverloads constructor(
     val userId: UUID,
     @CqlName("conv_id")
     @ClusteringColumn(1)
+    @JsonProperty("conversation_id")
     val convId: UUID = Uuids.timeBased(),
     val type: String, // "private" or "group"
     val exitedTime: Instant? = null,
@@ -151,7 +152,7 @@ data class Conversation @JvmOverloads constructor(
 data class ConversationResponse(
     val conversationId: UUID,
     val type: String, // "private" or "group"
-    var name: String?, // For group chats, null for private
+    var title: String?, // For group chats, null for private
     var participants: List<UserPublic>, // List of participants with public info
     var lastMessagePreview: String?,
     @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
@@ -165,7 +166,7 @@ data class ConversationPrivateRequest @JsonCreator constructor(
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 data class ConversationGroupCreateRequest(
-    val name: String,
+    val title: String,
     val participantIds: List<UUID>
 )
 
@@ -181,6 +182,7 @@ data class ConversationGroupParticipantsUpdate(
 @CqlName("messages_by_conversation")
 data class Message @JvmOverloads constructor(
     @PartitionKey(1)
+    @JsonProperty("conversation_id")
     val convId: UUID,
     @ClusteringColumn(1)
     val messageId: UUID,

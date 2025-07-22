@@ -87,7 +87,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       name = other?.username || 'Unknown User';
     } else {
       avatar = '/avatar-placeholder.png';
-      name = conv.name || 'Group Chat';
+      name = conv.title || 'Group Chat';
     }
 
     // Get last message from message store if available, otherwise use conversation's last_message

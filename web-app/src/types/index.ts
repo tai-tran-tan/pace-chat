@@ -18,9 +18,7 @@ export interface Conversation {
   participants: ConversationParticipant[];
   last_message_preview?: string | null;
   last_message_timestamp?: string | null;
-  unread_count: number;
-  created_at: string;
-  updated_at: string;
+  unread_count?: number | null;
 }
 
 export interface ConversationParticipant {
@@ -39,7 +37,6 @@ export interface Message {
   sender_name: string;
   sender_avatar?: string | null;
   content: string;
-  message_type: 'text' | 'image' | 'video' | 'file';
   timestamp: string;
   read_by: string[];
   reply_to?: Message | null;
@@ -70,7 +67,6 @@ export interface WsSendMessage extends WsMessage {
   type: 'SEND_MESSAGE';
   conversation_id: string;
   content: string;
-  message_type: 'text' | 'image' | 'video' | 'file';
   client_message_id: string;
 }
 

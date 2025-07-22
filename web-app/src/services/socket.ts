@@ -31,7 +31,7 @@ class WebSocketService {
   private lastActivityTime = Date.now();
 
   // WebSocket server URL
-  private readonly WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080/ws/chat';
+  private readonly WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws/chat';
   private readonly PING_INTERVAL = 30000; // 30 seconds
   private readonly PONG_TIMEOUT = 10000; // 10 seconds
 
@@ -361,14 +361,13 @@ class WebSocketService {
   }
 
   // Send chat message
-  public async sendMessage(conversationId: string, content: string, messageType: 'text' | 'image' | 'video' | 'file' = 'text'): Promise<string> {
+  public async sendMessage(conversationId: string, content: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const clientMessageId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const clientMessageId = crypto.randomUUID();
       const message: WsSendMessage = {
         type: 'SEND_MESSAGE',
         conversation_id: conversationId,
         content,
-        message_type: messageType,
         client_message_id: clientMessageId,
       };
 

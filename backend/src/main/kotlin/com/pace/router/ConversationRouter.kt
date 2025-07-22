@@ -80,7 +80,7 @@ class ConversationRouter(
             val userId = rc.user().subject().let { UUID.fromString(it) }
             val request = rc.bodyAsPojo<ConversationGroupCreateRequest>()
 
-            if (request.name.isBlank() || request.participantIds.size < 2 || !request.participantIds.contains(userId)) {
+            if (request.title.isBlank() || request.participantIds.size < 2 || !request.participantIds.contains(userId)) {
                 rc.response().setStatusCode(400)
                     .end(mapOf("message" to "Invalid group data. Name, at least 2 participants (including creator) are required.").toJsonString())
                 return@coroutineHandler
@@ -95,10 +95,10 @@ class ConversationRouter(
             }
 
             val newConversation =
-                db.createGroupConversation(userId, request.name, request.participantIds).toConversationResponse(
+                db.createGroupConversation(userId, request.title, request.participantIds).toConversationResponse(
                     participants.map { it.toUserPublic() })
             rc.response().setStatusCode(201).end(newConversation.toJsonString())
-            LOGGER.info("Group conversation '${newConversation.name}' created by $userId")
+            LOGGER.info("Group conversation '${newConversation.title}' created by $userId")
         }
 
         router.put("/conversations/group/:conversationId/participants").coroutineHandler { rc ->

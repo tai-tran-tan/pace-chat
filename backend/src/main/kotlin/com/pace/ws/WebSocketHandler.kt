@@ -219,7 +219,7 @@ class WebSocketHandler(
                 ws.writeTextMessage(
                     mapOf(
                         "type" to "ERROR",
-                        "message" to "Server error processing message."
+                        "message" to "Error processing WebSocket message: ${e.message}"
                     ).toJsonString()
                 )
             }
@@ -235,7 +235,8 @@ class WebSocketHandler(
                     connectionsManager.broadcastMessage(
                         WsMessage.WsPresenceUpdate(
                             userId = authenticatedUserId,
-                            status = WsMessage.UserStatus.ONLINE, lastSeen = Instant.now()
+                            status = WsMessage.UserStatus.ONLINE,
+                            lastSeen = Instant.now()
                         ),
                         excludeConnection = null
                     )

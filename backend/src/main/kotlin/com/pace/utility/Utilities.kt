@@ -3,9 +3,9 @@ package com.pace.utility
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.convertValue
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.json.JsonObject
@@ -18,7 +18,7 @@ inline fun <reified T : Any> JsonObject.deserialize(): T {
 
 inline fun <reified T : Any> Buffer.deserialize(): T {
     val json = OBJECT_MAPPER.readTree(this.bytes)
-    return OBJECT_MAPPER.convertValue(json, object: TypeReference<T>(){})
+    return OBJECT_MAPPER.convertValue(json)
 }
 
 inline fun <reified T : Any> String.deserialize(): T {
@@ -34,4 +34,3 @@ fun createObjectMapper(): ObjectMapper =
         .registerModule(JavaTimeModule())
         .configure(JsonParser.Feature.INCLUDE_SOURCE_IN_LOCATION, true)
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-        .setPropertyNamingStrategy(PropertyNamingStrategies.SnakeCaseStrategy.INSTANCE)

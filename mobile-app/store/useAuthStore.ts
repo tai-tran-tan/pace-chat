@@ -59,12 +59,12 @@ export const useAuthStore = create<AuthState>()(
           const response = await authApi.login(username, password);
           set({
             user: { user_id: response.user_id, username: response.username },
-            token: response.token,
+            token: response.access_token,
             refreshToken: response.refresh_token,
             isAuthenticated: true,
             isLoading: false
           });
-          api.defaults.headers.common['Authorization'] = `Bearer ${response.token}`;
+          api.defaults.headers.common['Authorization'] = `Bearer ${response.access_token}`;
           
           // Connect WebSocket after successful login
           try {

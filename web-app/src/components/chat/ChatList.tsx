@@ -57,14 +57,14 @@ const ChatList: React.FC<ChatListProps> = ({ items, onItemClick }) => {
     <div className='overflow-y-auto h-full'>
       {items.map((conversation) => (
         <ChatListItem
-          key={conversation.conversation_id}
-          conversationId={conversation.conversation_id}
+          key={conversation.conversationId}
+          conversationId={conversation.conversationId}
           avatar={getConversationAvatar(conversation) || ''}
           name={getConversationName(conversation)}
-          lastMessage={conversation.last_message_preview || 'No messages yet'}
-          unreadCount={conversation.unread_count}
-          time={formatTime(conversation.last_message_timestamp)}
-          onClick={() => onItemClick?.(conversation.conversation_id)}
+          lastMessage={conversation.lastMessage || 'No messages yet'}
+          unreadCount={conversation.unreadCount}
+          time={formatTime(conversation.time)}
+          onClick={() => onItemClick?.(conversation.conversationId)}
         />
       ))}
     </div>

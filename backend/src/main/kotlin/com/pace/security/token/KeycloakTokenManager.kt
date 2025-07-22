@@ -57,6 +57,7 @@ class KeycloakTokenManager(
             .add("grant_type", "client_credentials")
             .add("client_id", config.clientId)
             .add("client_secret", config.clientSecret)
+            .add("scope", "openid profile_full")
 
         val token = webClient.postAbs(tokenEndpoint)
                 .sendForm(form)

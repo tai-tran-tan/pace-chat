@@ -52,7 +52,7 @@ export default function ConversationList() {
       );
       return otherParticipant?.username || 'Unknown User';
     } else {
-      return conversation.name || 'Group Chat';
+      return conversation.title || 'Group Chat';
     }
   };
 

@@ -73,11 +73,18 @@ internal class CommonDbService(
     }
 
     override suspend fun updateUserStatus(userId: UUID, status: String, lastSeen: Instant?) {
-        storage.findUserById(userId)?.apply {
-            this.status = status
-            this.lastSeen = lastSeen
-            storage.updateUser(this)
-        }
+        val user = User(
+            userId = userId,
+            username = null,
+            firstName = null,
+            lastName = null,
+            email = null,
+            password = null,
+            avatarUrl = null,
+            status = status,
+            lastSeen = lastSeen
+        )
+        storage.updateUser(user)
     }
 
     override suspend fun addDeviceToken(userId: UUID, deviceToken: String, platform: String) {
@@ -116,14 +123,14 @@ internal class CommonDbService(
 
     override suspend fun createGroupConversation(
         creatorId: UUID,
-        name: String,
+        title: String,
         participantIds: List<UUID>
     ): Conversation {
         val newConv = Conversation(
             userId = creatorId,
             convId = UUID.randomUUID(),
             type = "group",
-            title = name,
+            title = title,
             participants = participantIds.toMutableSet(),
             lastMessagePreview = null,
             lastMessageTimestamp = null,

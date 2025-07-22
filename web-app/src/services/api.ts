@@ -93,8 +93,8 @@ class ApiService {
               const response = await this.refreshApi.post('/auth/refresh', { 
                 refresh_token: refreshToken 
               });
-              const newToken = response.data.data.access_token;
-              this.setTokens(newToken, response.data.data.refresh_token);
+              const newToken = data.data.access_token;
+              this.setTokens(newToken, data.data.refresh_token);
               
               // Process queued requests
               this.processQueue(null, newToken);
@@ -314,8 +314,9 @@ class ApiService {
     const response = await this.api.post('/auth/login', credentials);
     
     // Check if response has the expected structure
-    if (response.data && response.data.user_id && response.data.token) {
-      this.setTokens(response.data.token, response.data.refresh_token);
+    const data = response.data
+    if (data && data.user_id && data.access_token) {
+      this.setTokens(data.access_token, data.refresh_token);
     }
     return response;
   }

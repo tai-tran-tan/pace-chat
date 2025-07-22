@@ -1,8 +1,6 @@
 package com.pace.data.db.impl
 
-import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.google.inject.Inject
@@ -213,6 +211,7 @@ class KeycloakDataSource @Inject constructor(
 
     private suspend fun HttpRequest<*>.sendWithLog(body: Any? = null): Buffer? {
         val req = this
+        logger.info { "Request body: $body" }
         val res = when (body) {
             null -> send()
             is MultiMap -> sendForm(body)
@@ -263,7 +262,6 @@ data class KeycloakCredential(
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-@JsonInclude(JsonInclude.Include.NON_NULL)
 data class KeycloakUser(
     val id: UUID?,
     var username: String?,
@@ -277,24 +275,14 @@ data class KeycloakUser(
 ) {
     fun toUser() =
         User(
-            id!!,
-            username,
-            firstName,
-            lastName,
-            email,
-            credentials?.firstOrNull { it.type == "password" }?.value,
-            attributes?.get("status")?.firstOrNull(),
-            attributes?.get("avatar_url")?.firstOrNull(),
-            attributes?.get("last_seen")?.firstOrNull()?.let { Instant.parse(it) }
+            userId = id!!,
+            username = username,
+            firstName = firstName,
+            lastName = lastName,
+            email = email,
+            password = credentials?.firstOrNull { it.type == "password" }?.value,
+            status = attributes?.get("status")?.firstOrNull(),
+            avatarUrl = attributes?.get("avatar_url")?.firstOrNull(),
+            lastSeen = attributes?.get("last_seen")?.firstOrNull()?.let { Instant.parse(it) }
         )
 }
-
-private data class SgRowResponse<T : Any> @JsonCreator constructor(
-    val count: Int? = null,
-    val pageState: String? = null,
-    val data: List<T>
-)
-
-private data class SgResponseWrapper<T : Any> @JsonCreator constructor(
-    val data: T
-)

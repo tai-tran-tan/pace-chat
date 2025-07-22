@@ -70,7 +70,7 @@ In production mode, global error handling is disabled to avoid exposing sensitiv
 
 ## Environment Variables
 
-- `NEXT_PUBLIC_API_URL`: Backend API URL (default: http://localhost:8080/v1)
+- `NEXT_PUBLIC_API_URL`: Backend API URL (default: http://localhost:8000/v1)
 - `NODE_ENV`: Environment mode (development/production)
 
 ## Tech Stack
