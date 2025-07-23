@@ -394,6 +394,7 @@ class WebSocketService {
 
       try {
         this.send(message);
+        clearTimeout(timeout); // TODO: bro, check this 
       } catch (error) {
         this.messageHandlers.delete(handleMessageDelivered);
         clearTimeout(timeout);

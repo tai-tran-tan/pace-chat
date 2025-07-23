@@ -2,6 +2,8 @@
 export interface User {
   user_id: string;
   username: string;
+  first_name: string;
+  last_name: string;
   email: string;
   avatar_url?: string | null;
   status: 'online' | 'offline' | 'away';
@@ -13,7 +15,7 @@ export interface User {
 // Conversation types
 export interface Conversation {
   conversation_id: string;
-  name?: string | null;
+  title?: string | null;
   type: 'private' | 'group';
   participants: ConversationParticipant[];
   last_message_preview?: string | null;
@@ -123,6 +125,8 @@ export interface LoginResponse {
 
 export interface RegisterRequest {
   username: string;
+  first_name: string;
+  last_name: string;
   email: string;
   password: string;
 }

@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils';
 
 const registerSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email format'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
@@ -39,7 +41,14 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      await registerUser(data.username, data.email, data.password);
+      const request = { 
+        username: data.username,
+        first_name: data.firstName,
+        last_name: data.lastName,
+        email: data.email,
+        password: data.password
+       }
+      await registerUser(request);
       toast.success('Registration successful! Please sign in to continue.');
       setTimeout(() => {
         router.push('/auth/login');
@@ -105,6 +114,57 @@ export default function RegisterPage() {
               </div>
               {errors.username && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.username.message}</p>
+              )}
+            </div>
+
+            {/* firstName Field */}
+            <div>
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                First Name
+              </label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  {...register('firstName')}
+                  id="firstName"
+                  type="text"
+                  className={cn(
+                    'block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm',
+                    'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white',
+                    errors.firstName && 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500'
+                  )}
+                  placeholder="Bob"
+                />
+              </div>
+              {errors.firstName && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.firstName.message}</p>
+              )}
+            </div>
+            {/* lastName Field */}
+            <div>
+              <label htmlFor="Last Name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Last Name
+              </label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  {...register('lastName')}
+                  id="lastName"
+                  type="text"
+                  className={cn(
+                    'block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm',
+                    'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white',
+                    errors.lastName && 'border-red-300 dark:border-red-600 focus:ring-red-500 focus:border-red-500'
+                  )}
+                  placeholder="Minion"
+                />
+              </div>
+              {errors.lastName && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.lastName.message}</p>
               )}
             </div>
 

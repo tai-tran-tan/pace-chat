@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User } from '@/types';
+import { RegisterRequest, User } from '@/types';
 import apiService from '@/services/api';
 
 interface AuthState {
@@ -12,7 +12,7 @@ interface AuthState {
 
 interface AuthActions {
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  register: (user: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   getCurrentUser: () => Promise<void>;
   clearError: () => void;
@@ -25,6 +25,8 @@ function mapApiUserToUser(apiUser: any): User {
   return {
     user_id: apiUser.user_id,
     username: apiUser.username,
+    first_name: apiUser.first_name,
+    last_name: apiUser.last_name,
     email: apiUser.email || '',
     avatar_url: apiUser.avatar_url || null,
     status: 'online',
@@ -99,10 +101,10 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
-      register: async (username: string, email: string, password: string) => {
+      register: async (user: RegisterRequest) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await apiService.register({ username, email, password });
+          const response = await apiService.register(user);
           const data = response.data
 
           // Check if response has the expected structure for register

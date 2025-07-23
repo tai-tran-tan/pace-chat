@@ -179,26 +179,26 @@ export default function ChatPage() {
   // Gửi tin nhắn qua WebSocket
   const handleSend = async () => {
     if (!input.trim() || !user || !conversationId || !isClient) return;
-    setIsSending(true);
+    // setIsSending(true);
     // Đảm bảo WebSocket đã kết nối
     if (!isWsConnected) {
       await socketService.connect();
       if (!socketService.isConnected) {
-        setIsSending(false);
+        // setIsSending(false);
         alert('WebSocket not connected. Please try again.');
         return;
       }
       setIsWsConnected(true);
     }
     const tempMessage: Message = {
-      message_id: `temp_${conversationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      message_id: `temp_${conversationId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // ignored by server
       conversation_id: conversationId,
       sender_id: user.user_id,
       sender_name: user.username,
-      sender_avatar: user.avatar_url || undefined,
+      sender_avatar: user.avatar_url || undefined, // what for?
       content: input,
-      timestamp: new Date().toISOString(),
-      read_by: [],
+      timestamp: new Date().toISOString(),  // ignored by server
+      read_by: [], // ignored by server
     };
     
     // Add temp message to store
@@ -207,7 +207,7 @@ export default function ChatPage() {
     setInput('');
     
     try {
-      await socketService.sendMessage(conversationId, input, 'text');
+      await socketService.sendMessage(conversationId, input);
       // Khi server gửi MESSAGE_RECEIVED sẽ tự động update UI
     } catch (err) {
       // Remove temp message on error
@@ -215,8 +215,6 @@ export default function ChatPage() {
       const filtered = currentMessages.filter((m) => m.message_id !== tempMessage.message_id);
       setMessages(conversationId, filtered);
       console.error('Failed to send message:', err);
-    } finally {
-      setIsSending(false);
     }
   };
 
@@ -309,7 +307,7 @@ export default function ChatPage() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onSend={handleSend}
-              disabled={isSending}
+              // disabled={isSending} // no need cuz of validation before send
             />
           </form>
         </>
