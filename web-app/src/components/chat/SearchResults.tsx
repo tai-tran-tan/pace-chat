@@ -135,7 +135,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {conversation.name || 
+                    {conversation.title || 
                      (conversation.type === 'private' && conversation.participants
                        ? conversation.participants[0]?.username || 'Unknown User'
                        : 'Group Chat')}
