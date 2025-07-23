@@ -45,9 +45,9 @@ class ConnectionsManager(private val db: DbAccessible) {
     suspend fun broadcastMessageToConversationParticipants(conversationId: UUID, message: Any) {
         val conversation = db.findConversationById(conversationId)
         if (conversation != null) {
-//            conversation.participants.forEach { participant ->
-//                sendMessageToUser(participant, message)
-//            }
+            conversation.participants.forEach { participant ->
+                sendMessageToUser(participant, message)
+            }
             LOGGER.debug("Broadcasted message to participants of conversation $conversationId: ${message.toJsonString()}")
         } else {
             LOGGER.warn("Attempted to broadcast to non-existent conversation: $conversationId")
