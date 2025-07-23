@@ -6,6 +6,7 @@ import com.pace.data.model.WsMessage
 import com.pace.security.JwtService
 import com.pace.utility.deserialize
 import com.pace.utility.toJsonString
+import io.vertx.core.Handler
 import io.vertx.core.http.ServerWebSocket
 import io.vertx.core.json.JsonObject
 import io.vertx.kotlin.coroutines.dispatcher
@@ -20,8 +21,8 @@ class WebSocketHandler(
     private val jwtService: JwtService,
     private val db: DbAccessible,
     private val connectionsManager: ConnectionsManager
-) {
-    fun handle(ws: ServerWebSocket) {
+) : Handler<ServerWebSocket> {
+    override fun handle(ws: ServerWebSocket) {
         LOGGER.info("New WebSocket connection from: ${ws.remoteAddress()}")
 
         var authenticatedUserId: UUID? = null

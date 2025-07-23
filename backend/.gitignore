@@ -3,4 +3,6 @@
 .kotlin
 build
 infra/cassandra
+database/cassandra
 /file-uploads/
+logs
