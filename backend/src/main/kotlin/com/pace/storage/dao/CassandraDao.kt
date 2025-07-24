@@ -6,7 +6,6 @@ import com.datastax.oss.driver.api.mapper.annotations.DaoFactory
 import com.datastax.oss.driver.api.mapper.annotations.Delete
 import com.datastax.oss.driver.api.mapper.annotations.Insert
 import com.datastax.oss.driver.api.mapper.annotations.Mapper
-import com.datastax.oss.driver.api.mapper.annotations.Query
 import com.datastax.oss.driver.api.mapper.annotations.Select
 import com.datastax.oss.driver.api.mapper.annotations.Update
 import com.pace.data.model.Conversation
@@ -48,8 +47,8 @@ interface MessageDao {
     @Delete
     fun delete(message: Message)
 
-    @Query("SELECT * FROM messages_by_conversation WHERE conv_id = :convId")
-    fun findByConversation(convId: UUID): PagingIterable<Message>
+    @Select(customWhereClause = "conv_id = :convId limit :lim")
+    fun findByConversation(convId: UUID, lim: Int): PagingIterable<Message>
 }
 
 

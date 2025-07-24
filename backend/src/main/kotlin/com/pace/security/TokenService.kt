@@ -35,6 +35,7 @@ class TokenService private constructor(private val client: WebClient, private va
         return UserPublic(
             userId = requireNotNull(token.userId),
             username = requireNotNull(token.username),
+            displayName = "${requireNotNull(token.firstName)} ${requireNotNull(token.lastName)}"
         )
     }
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import ChatListItem from './ChatListItem';
 import { Conversation } from '@/types';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface ChatListProps {
   items: Conversation[];
@@ -8,6 +9,7 @@ interface ChatListProps {
 }
 
 const ChatList: React.FC<ChatListProps> = ({ items, onItemClick }) => {
+  const { user } = useAuthStore();
   const formatTime = (timestamp: string | null) => {
     if (!timestamp) return '';
     
@@ -31,16 +33,6 @@ const ChatList: React.FC<ChatListProps> = ({ items, onItemClick }) => {
     }
   };
 
-  const getConversationName = (conversation: Conversation) => {
-    if (conversation.name) return conversation.name;
-    
-    if (conversation.type === 'private' && conversation.participants && conversation.participants.length > 0) {
-      return conversation.participants[0].username;
-    }
-    
-    return 'Group Chat';
-  };
-
   const getConversationAvatar = (conversation: Conversation) => {
     if (conversation.type === 'group') {
       return null; // Use default group icon
@@ -60,7 +52,7 @@ const ChatList: React.FC<ChatListProps> = ({ items, onItemClick }) => {
           key={conversation.conversationId}
           conversationId={conversation.conversationId}
           avatar={getConversationAvatar(conversation) || ''}
-          name={getConversationName(conversation)}
+          name={conversation.displayName}
           lastMessage={conversation.lastMessage || 'No messages yet'}
           unreadCount={conversation.unreadCount}
           time={formatTime(conversation.time)}

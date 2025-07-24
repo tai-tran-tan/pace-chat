@@ -26,9 +26,9 @@ export interface Conversation {
 export interface ConversationParticipant {
   user_id: string;
   username: string;
+  display_name: string;
   avatar_url?: string | null;
   status: 'online' | 'offline' | 'away';
-  joined_at: string;
 }
 
 // Message types

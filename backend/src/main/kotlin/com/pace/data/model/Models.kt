@@ -38,7 +38,10 @@ data class User(
     @JsonDeserialize(using = InstantWithNanoSecondDeserializer::class)
     var lastSeen: Instant?
 ) {
-    fun toUserPublic() = UserPublic(userId, requireNotNull(username), avatarUrl)
+    fun toUserPublic() = UserPublic(
+        userId, requireNotNull(username),
+        "${requireNotNull(firstName)} ${requireNotNull(lastName)}",
+        avatarUrl)
     fun toUserResponse() = UserResponse(userId, requireNotNull(username), email, status, avatarUrl, lastSeen)
 
     fun toKeycloakUser() = KeycloakUser(
@@ -62,6 +65,7 @@ data class User(
 data class UserPublic(
     val userId: UUID,
     val username: String,
+    val displayName: String,
     val avatarUrl: String? = null
 )
 

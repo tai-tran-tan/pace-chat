@@ -80,29 +80,30 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   // Mapping conversations sang chatItems cho Sidebar
   const chatItems = conversations.map((conv) => {
     let avatar = '';
-    let name = '';
+    let displayName = '';
     if (conv.type === 'private' && conv.participants) {
       const other = conv.participants.find((p) => p.user_id !== user?.user_id);
       avatar = other?.avatar_url || '/avatar-placeholder.png';
-      name = other?.username || 'Unknown User';
+      displayName = other?.display_name || 'Unknown User';
     } else {
       avatar = '/avatar-placeholder.png';
-      name = conv.title || 'Group Chat';
+      displayName = conv.title || 'Group Chat';
     }
 
     // Get last message from message store if available, otherwise use conversation's last_message
     const lastMessageFromStore = getLastMessage(conv.conversation_id);
-    const lastMessageContent = lastMessageFromStore?.content || conv.last_message?.content || 'No messages yet';
+    const lastMessageContent = lastMessageFromStore?.content || conv.last_message_preview || 'No messages yet';
     const lastMessageTime = isClient && lastMessageFromStore?.timestamp 
       ? new Date(lastMessageFromStore.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : isClient && conv.last_message?.timestamp
-      ? new Date(conv.last_message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : isClient && conv.last_message_timestamp
+      ? new Date(conv.last_message_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';
 
     return {
       conversationId: conv.conversation_id,
       avatar,
-      name,
+      displayName,
+      type: conv.type,
       lastMessage: lastMessageContent,
       unreadCount: conv.unread_count,
       time: lastMessageTime,

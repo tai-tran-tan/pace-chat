@@ -17,7 +17,7 @@ class MessageRouter(private val router: Router, private val db: DbAccessible) {
         router.get("/conversations/:conversationId/messages").coroutineHandler { rc ->
             val userId = rc.user().subject().let { UUID.fromString(it) }
             val conversationId = rc.pathParam("conversationId").let { UUID.fromString(it) }
-            val limit = rc.request().getParam("limit")?.toIntOrNull() ?: 50
+            val limit = rc.request().getParam("limit")?.toIntOrNull() ?: 30
             val beforeMessageId = rc.request().getParam("before_message_id")?.let { UUID.fromString(it) }
 
             val conversation = db.findConversationById(conversationId)

@@ -33,22 +33,14 @@ export default function ChatPage() {
   const [activeTab, setActiveTab] = useState<'conversation' | 'files'>('conversation');
   const [isClient, setIsClient] = useState(false);
   const [isWsConnected, setIsWsConnected] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
+  
   // Get messages from message store
   const messages = getMessages(conversationId);
-
+  
   // Ensure we're on client side
   useEffect(() => {
     setIsClient(true);
   }, []);
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (isClient) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, isClient]);
 
   // Fetch conversation detail and messages
   const fetchConversation = useCallback(async () => {
@@ -143,7 +135,6 @@ export default function ChatPage() {
         setIsWsConnected(false);
       }
     });
-    
     return () => {
       isMounted = false;
       unsubscribe();
@@ -248,10 +239,10 @@ export default function ChatPage() {
   }
 
   // Get display name for conversation
-    const getConversationDisplayName = (conv: Conversation): string => {
+  const getConversationDisplayName = (conv: Conversation): string => {
     if (conv.type === 'private') {
       const other = conv.participants.find((p) => p.user_id !== user?.user_id);
-      return other?.username || 'Unknown User';
+      return other?.display_name || 'Unknown User';
     }
     return conv.title || 'Group Chat';
   };
@@ -294,7 +285,6 @@ export default function ChatPage() {
         <>
           <div className='flex-1 flex flex-col overflow-y-auto'>
             <ChatMessages messages={mappedMessages} />
-            <div ref={messagesEndRef} />
           </div>
           <form
             onSubmit={(e) => {

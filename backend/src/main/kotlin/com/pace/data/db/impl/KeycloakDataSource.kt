@@ -134,7 +134,7 @@ class KeycloakDataSource @Inject constructor(
         limit: Int,
         beforeMessageId: UUID?
     ): List<Message> {
-        return messageDao.findByConversation(conversationId).all()
+        return messageDao.findByConversation(conversationId, limit).all()
     }
 
     override suspend fun addMessage(newMessage: Message) {
