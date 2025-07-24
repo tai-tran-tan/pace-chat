@@ -62,7 +62,7 @@ data class User(
 data class UserPublic(
     val userId: UUID,
     val username: String,
-    val avatarUrl: String?
+    val avatarUrl: String? = null
 )
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)

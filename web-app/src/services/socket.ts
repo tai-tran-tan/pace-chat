@@ -184,7 +184,8 @@ class WebSocketService {
         console.log('WebSocket: Creating native WebSocket connection...');
 
         // Create native WebSocket connection
-        this.ws = new WebSocket(this.WS_URL);
+        // Send token during handshake, only authenticated user are allow to connect
+        this.ws = new WebSocket(this.WS_URL + '?access_token=' + token);
 
         // Add connection timeout
         const connectionTimeout = setTimeout(() => {
@@ -204,8 +205,6 @@ class WebSocketService {
           this.isConnecting = false;
           this.reconnectAttempts = 0;
           this.updateActivity();
-          console.log('WebSocket: About to authenticate...');
-          this.authenticate(token);
           this.startPingPong();
           this.notifyConnectionHandlers();
           resolve();
@@ -225,20 +224,6 @@ class WebSocketService {
                 clearTimeout(this.pongTimeout);
                 this.pongTimeout = null;
               }
-              return;
-            }
-            
-            // Handle authentication response
-            if (message.type === 'AUTH_SUCCESS') {
-              this.isAuthenticated = true;
-              console.log('WebSocket: Authentication successful!');
-              console.log('WebSocket: Auth success message:', JSON.stringify(message, null, 2));
-            } else if (message.type === 'AUTH_FAILURE') {
-              this.isAuthenticated = false;
-              console.error('WebSocket: Authentication failed:', message.reason);
-              console.error('WebSocket: Auth failure message:', JSON.stringify(message, null, 2));
-              this.disconnect();
-              this.notifyErrorHandlers(new Error(`Authentication failed: ${message.reason}`));
               return;
             }
             
@@ -276,58 +261,19 @@ class WebSocketService {
     });
   }
 
-  // Authenticate with server
-  private authenticate(token: string): void {
-    console.log('WebSocket: Authenticating with token...');
-    console.log('WebSocket: Token length:', token.length);
-    console.log('WebSocket: Token preview:', token.substring(0, 20) + '...');
-    
-    const authMessage: WsAuthMessage = {
-      type: 'AUTH',
-      token,
-    };
-    console.log('WebSocket: Sending auth message:', JSON.stringify(authMessage, null, 2));
-    
-    try {
-      this.sendRaw(authMessage);
-      console.log('WebSocket: Auth message sent successfully');
-      
-      // Set timeout for auth response
-      setTimeout(() => {
-        if (!this.isAuthenticated) {
-          console.error('WebSocket: Authentication timeout - no AUTH_SUCCESS received');
-          console.log('WebSocket: Current state - connected:', this.ws?.readyState === WebSocket.OPEN, 'authenticated:', this.isAuthenticated);
-          
-          // Try to resend auth message
-          console.log('WebSocket: Retrying authentication...');
-          try {
-            this.sendRaw(authMessage);
-            console.log('WebSocket: Auth message resent');
-          } catch (error) {
-            console.error('WebSocket: Failed to resend auth message:', error);
-          }
-        }
-      }, 5000); // 5 seconds timeout
-      
-    } catch (error) {
-      console.error('WebSocket: Failed to send auth message:', error);
-    }
-  }
-
   // Send message to server
   private send(message: WsMessage): void {
     console.log('WebSocket: Attempting to send message:', message.type);
-    console.log('WebSocket: Connection state - connected:', this.ws?.readyState === WebSocket.OPEN, 'authenticated:', this.isAuthenticated);
+    console.log('WebSocket: Connection state - connected:', this.ws?.readyState === WebSocket.OPEN);
     
-    if (this.ws?.readyState === WebSocket.OPEN && this.isAuthenticated) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
       this.updateActivity();
       console.log('WebSocket: Message sent successfully');
     } else {
-      console.error('WebSocket: Cannot send message, not connected or not authenticated');
+      console.error('WebSocket: Cannot send message, not connected');
       console.error('WebSocket: Socket readyState:', this.ws?.readyState);
-      console.error('WebSocket: Is authenticated:', this.isAuthenticated);
-      throw new Error('WebSocket not connected or not authenticated');
+      throw new Error('WebSocket not connected');
     }
   }
 

@@ -1,6 +1,6 @@
 package com.pace.config
 
-import com.pace.utility.deserialize
+import com.pace.extensions.deserialize
 import io.vertx.config.ConfigRetriever
 import io.vertx.config.ConfigRetrieverOptions
 import io.vertx.config.ConfigStoreOptions

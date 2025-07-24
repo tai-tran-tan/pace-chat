@@ -11,21 +11,19 @@ import com.pace.data.model.DeviceToken
 import com.pace.data.model.Message
 import com.pace.data.model.User
 import com.pace.data.storage.DataSource
+import com.pace.extensions.deserialize
+import com.pace.extensions.sendWithLog
+import com.pace.security.TokenService
 import com.pace.security.token.KeycloakTokenManager
-import com.pace.utility.deserialize
-import io.vertx.core.MultiMap
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
-import io.vertx.core.http.impl.headers.HeadersMultiMap
 import io.vertx.ext.web.client.HttpRequest
 import io.vertx.ext.web.client.WebClient
-import io.vertx.kotlin.coroutines.coAwait
 import io.vertx.kotlin.coroutines.dispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import org.apache.logging.log4j.kotlin.logger
-import java.net.URLEncoder
 import java.time.Instant
 import java.util.UUID
 
@@ -35,11 +33,12 @@ class KeycloakDataSource @Inject constructor(
     @Inject private val client: WebClient,
     @Inject private val configuration: Configuration
 ) : DataSource {
-    private val baseUri = configuration.authService.baseUrl
-    private val baseUriUser = "$baseUri/realms/${configuration.authService.realmName}"
-    private val baseUriAdmin = "$baseUri/admin/realms/${configuration.authService.realmName}"
-    private val tokenMngr = KeycloakTokenManager(vertx, configuration.authService)
-
+    private val authConfig = configuration.authService
+    private val baseUri = authConfig.baseUrl
+    private val baseUriUser = "$baseUri/realms/${authConfig.realmName}"
+    private val baseUriAdmin = "$baseUri/admin/realms/${authConfig.realmName}"
+    private val tokenMngr = KeycloakTokenManager(vertx, authConfig)
+    private val tokenService = TokenService.create(client, authConfig)
     override suspend fun register(user: User) {
         client.postAbs("$baseUriAdmin/users")
             .sendWithAuthToken(user.toKeycloakUser())
@@ -50,32 +49,6 @@ class KeycloakDataSource @Inject constructor(
             .putHeader("Authorization", token)
             .sendWithLog()
             ?.deserialize<User>()
-    }
-
-    override suspend fun authenticate(username: String, password: String): AuthenticationResponse? {
-        return client.postAbs("$baseUriUser/protocol/openid-connect/token")
-            .sendWithLog(
-                HeadersMultiMap()
-                    .add("grant_type", "password")
-                    .add("client_id", configuration.authService.clientId)
-                    .add("username", username)
-                    .add("password", password)
-                    .add("scope", "openid profile_full")
-                    .add("client_secret", configuration.authService.clientSecret)
-            )
-            ?.deserialize<AuthenticationResponse>()
-    }
-
-    override suspend fun refreshToken(refreshToken: String): AuthenticationResponse? {
-        return client.postAbs("$baseUriUser/protocol/openid-connect/token")
-            .sendWithLog(
-                HeadersMultiMap()
-                    .add("grant_type", "refresh_token")
-                    .add("client_id", configuration.authService.clientId)
-                    .add("refresh_token", refreshToken)
-                    .add("client_secret", configuration.authService.clientSecret)
-            )
-            ?.deserialize<AuthenticationResponse>()
     }
 
     override suspend fun findUserById(userId: UUID): User? {
@@ -209,40 +182,11 @@ class KeycloakDataSource @Inject constructor(
         return sendWithLog(body)
     }
 
-    private suspend fun HttpRequest<*>.sendWithLog(body: Any? = null): Buffer? {
-        val req = this
-        logger.info { "Request body: $body" }
-        val res = when (body) {
-            null -> send()
-            is MultiMap -> sendForm(body)
-            else -> sendJson(body)
-        }
-        return res.onComplete { ar ->
-            LOGGER.info {
-                val response = ar.result()
-                "${response?.statusCode()} ${req.method()} ${req.uri()} " +
-                        (response?.bodyAsString() ?: "<empty response>")
-            }
-        }
-            .onFailure {
-                LOGGER.error(it) {
-                    "${req.method()} ${req.uri()} FAILED"
-                }
-            }.coAwait()
-            .takeIf { it.statusCode() < 400 }
-            ?.runCatching { this.bodyAsBuffer() }
-            ?.getOrElse { err ->
-                LOGGER.error(err) { "Deserialization problem" }
-                null
-            }
-    }
-
     companion object {
         private val LOGGER = logger()
     }
-}
-private fun String.urlEncode() = URLEncoder.encode(this, Charsets.UTF_8)
 
+}
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)
 @JsonIgnoreProperties(ignoreUnknown = true)

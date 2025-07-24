@@ -50,21 +50,6 @@ export interface WsMessage {
   [key: string]: any;
 }
 
-export interface WsAuthMessage extends WsMessage {
-  type: 'AUTH';
-  token: string;
-}
-
-export interface WsAuthSuccess extends WsMessage {
-  type: 'AUTH_SUCCESS';
-  user_id: string;
-}
-
-export interface WsAuthFailure extends WsMessage {
-  type: 'AUTH_FAILURE';
-  reason: string;
-}
-
 export interface WsSendMessage extends WsMessage {
   type: 'SEND_MESSAGE';
   conversation_id: string;

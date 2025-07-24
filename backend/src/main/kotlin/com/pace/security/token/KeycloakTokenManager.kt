@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.pace.config.AuthService
-import com.pace.utility.deserialize
+import com.pace.extensions.deserialize
 import io.vertx.core.Vertx
 import io.vertx.core.http.impl.headers.HeadersMultiMap
 import io.vertx.ext.web.client.WebClient

@@ -1,6 +1,5 @@
 package com.pace.data.storage
 
-import com.pace.data.db.impl.AuthenticationResponse
 import com.pace.data.model.Conversation
 import com.pace.data.model.DeviceToken
 import com.pace.data.model.Message
@@ -9,7 +8,6 @@ import java.util.UUID
 
 interface DataSource {
     suspend fun register(user: User)
-    suspend fun authenticate(username: String, password: String): AuthenticationResponse?
     suspend fun findUserById(userId: UUID): User?
     suspend fun findUserByUsername(username: String): User?
     suspend fun findUserByEmail(email: String): User?
@@ -26,6 +24,5 @@ interface DataSource {
     suspend fun updateConversation(conv: Conversation): Boolean
     suspend fun updateMessage(message: Message)
     suspend fun findUserByIds(userIds: List<UUID>): List<User>
-    suspend fun refreshToken(refreshToken: String): AuthenticationResponse?
     suspend fun getUserInfo(token: String): User?
 }

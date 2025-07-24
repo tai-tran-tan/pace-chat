@@ -1,6 +1,5 @@
 package com.pace.data.db
 
-import com.pace.data.db.impl.AuthenticationResponse
 import com.pace.data.model.Conversation
 import com.pace.data.model.Message
 import com.pace.data.model.ProfileUpdate
@@ -31,9 +30,7 @@ interface DbAccessible {
     suspend fun searchUsers(query: String): List<User>
     suspend fun findUserByEmail(email: String): User?
     suspend fun findUserById(userId: UUID): User?
-    suspend fun authenticateUser(username: String, password: String): AuthenticationResponse?
     suspend fun registerUser(user: User)
     suspend fun findUserByIds(userIds: List<UUID>): List<User>
-    suspend fun refreshToken(refreshToken: String): AuthenticationResponse?
     suspend fun getUserInfo(token: String): User?
 }

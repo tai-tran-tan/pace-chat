@@ -1,4 +1,4 @@
-package com.pace.utility
+package com.pace.extensions
 
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.core.type.TypeReference

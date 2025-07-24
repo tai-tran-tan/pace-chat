@@ -2,29 +2,29 @@
 package com.pace.ws
 
 import com.pace.data.db.DbAccessible
-import com.pace.utility.toJsonString
+import com.pace.extensions.toJsonString
 import org.apache.logging.log4j.kotlin.logger
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 class ConnectionsManager(private val db: DbAccessible) {
     // Using userId -> Connection for quick lookup and managing authenticated sessions
-    private val connections = ConcurrentHashMap<UUID, Connection>()
+    private val connections = ConcurrentHashMap<String, Connection>()
 
-    fun addConnection(connection: Connection) {
-        connections[connection.userId] = connection
-        LOGGER.info("Connection added for user: ${connection.username} (Total: ${connections.size})")
+    fun addConnection(wsId: String, connection: Connection) {
+        connections[wsId] = connection
+        LOGGER.info("Connection added for user: ${connection.username}, key: $wsId (Total: ${connections.size})")
     }
 
-    fun removeConnection(userId: UUID) {
-        val connection = connections.remove(userId)
+    fun removeConnection(wsId: String) {
+        val connection = connections.remove(wsId)
         if (connection != null) {
-            LOGGER.info("Connection removed for user: ${connection.username} (Total: ${connections.size})")
+            LOGGER.info("Connection removed for user: ${connection.username}, key: $wsId (Total: ${connections.size})")
         }
     }
 
     fun sendMessageToUser(userId: UUID, message: Any) {
-        val connection = connections[userId]
+        val connection = connections.values.firstOrNull { c -> c.userId == userId }
         if (connection != null && !connection.session.isClosed) {
             connection.session.writeTextMessage(message.toJsonString())
             LOGGER.debug("Sent message to user $userId: $message")
@@ -53,6 +53,8 @@ class ConnectionsManager(private val db: DbAccessible) {
             LOGGER.warn("Attempted to broadcast to non-existent conversation: $conversationId")
         }
     }
+
+    fun getConnection(wsId: String) = connections[wsId]
 
     companion object {
         private val LOGGER = logger()

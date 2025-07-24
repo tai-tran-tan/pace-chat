@@ -21,26 +21,10 @@ interface BaseWsMessage {
   type: WsMessageType;
 }
 
-interface WsAuthMessage extends BaseWsMessage {
-  type: 'AUTH';
-  token: string;
-}
-
-interface WsAuthSuccess extends BaseWsMessage {
-  type: 'AUTH_SUCCESS';
-  user_id: string;
-}
-
-interface WsAuthFailure extends BaseWsMessage {
-  type: 'AUTH_FAILURE';
-  reason: string;
-}
-
 interface WsSendMessage extends BaseWsMessage {
   type: 'SEND_MESSAGE';
   conversation_id: string;
   content: string;
-  message_type: 'text' | 'image' | 'video' | 'file';
   client_message_id: string;
 }
 
@@ -59,7 +43,6 @@ interface WsMessageReceived extends BaseWsMessage {
     conversation_id: string;
     sender_id: string;
     content: string;
-    message_type: 'text' | 'image' | 'video' | 'file';
     timestamp: string;
     read_by: string[];
   };
@@ -244,7 +227,6 @@ class WebSocketService {
         this.isConnecting = false;
         this.reconnectAttempts = 0;
         this.updateActivity();
-        this.authenticate(token);
         this.startPingPong();
         this.notifyConnectionHandlers();
       };
@@ -321,17 +303,6 @@ class WebSocketService {
     }
   }
 
-  // Authenticate WebSocket connection
-  private authenticate(token: string) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      const authMessage: WsAuthMessage = {
-        type: 'AUTH',
-        token,
-      };
-      this.send(authMessage);
-    }
-  }
-
   // Send message to WebSocket server
   public send(message: WsMessage) {
     if (this.ws?.readyState === WebSocket.OPEN) {
@@ -344,14 +315,13 @@ class WebSocketService {
   }
 
   // Send chat message
-  public async sendMessage(conversationId: string, content: string, messageType: 'text' | 'image' | 'video' | 'file' = 'text'): Promise<string> {
+  public async sendMessage(conversationId: string, content: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const clientMessageId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const message: WsSendMessage = {
         type: 'SEND_MESSAGE',
         conversation_id: conversationId,
         content,
-        message_type: messageType,
         client_message_id: clientMessageId,
       };
 
@@ -378,9 +348,9 @@ class WebSocketService {
 
       try {
         this.send(message);
+        clearTimeout(timeout); // TODO: bro, check this 
       } catch (error) {
         this.messageHandlers.delete(handleMessageDelivered);
-        clearTimeout(timeout);
         reject(error);
       }
     });

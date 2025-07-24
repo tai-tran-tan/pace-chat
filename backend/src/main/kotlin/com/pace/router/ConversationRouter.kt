@@ -5,7 +5,9 @@ import com.pace.data.model.ConversationGroupCreateRequest
 import com.pace.data.model.ConversationGroupParticipantsUpdate
 import com.pace.data.model.ConversationPrivateRequest
 import com.pace.data.model.WsMessage
-import com.pace.utility.toJsonString
+import com.pace.extensions.bodyAsPojo
+import com.pace.extensions.coroutineHandler
+import com.pace.extensions.toJsonString
 import com.pace.ws.ConnectionsManager
 import io.vertx.ext.web.Router
 import org.apache.logging.log4j.kotlin.logger

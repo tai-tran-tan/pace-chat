@@ -9,13 +9,19 @@ import com.pace.data.model.AuthRegisterRequest
 import com.pace.data.model.AuthRegisterResponse
 import com.pace.data.model.RefreshTokenRequest
 import com.pace.data.model.User
-import com.pace.security.JwtService
-import com.pace.utility.toJsonString
+import com.pace.extensions.bodyAsPojo
+import com.pace.extensions.coroutineHandler
+import com.pace.extensions.toJsonString
+import com.pace.security.TokenService
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
 import org.apache.logging.log4j.kotlin.logger
 
-class AuthRouter(private val router: Router, private val db: DbAccessible) {
+class AuthRouter(
+    private val router: Router,
+    private val tokenService: TokenService,
+    private val db: DbAccessible
+) {
 
     fun setupRoutes() {
         router.post("/v1/auth/register").handler(BodyHandler.create()).coroutineHandler { rc ->
@@ -67,10 +73,10 @@ class AuthRouter(private val router: Router, private val db: DbAccessible) {
 
         router.post("/v1/auth/login").handler(BodyHandler.create()).coroutineHandler { rc ->
             val request = rc.bodyAsPojo<AuthLoginRequest>()
-            val res = db.authenticateUser(request.username, request.password)
+            val res = tokenService.authenticate(request.username, request.password)
 
             if (res != null) {
-                val token = JwtService().verifyIdToken(res.accessToken)
+                val token = tokenService.verifyIdToken(res.accessToken)
                 val user = AuthLoginResponse(
                     token.userId, token.username,
                     res.accessToken, res.expiresIn,
@@ -86,7 +92,7 @@ class AuthRouter(private val router: Router, private val db: DbAccessible) {
 
         router.post("/v1/auth/refresh-token").handler(BodyHandler.create()).coroutineHandler { rc ->
             val request = rc.bodyAsPojo<RefreshTokenRequest>()
-            val token = db.refreshToken(request.refreshToken)
+            val token = tokenService.refreshToken(request.refreshToken)
             if (token != null) {
                 rc.response().setStatusCode(200).end(token.toJsonString())
                 LOGGER.info("Token refreshed for user: ${rc.get("userId", "")}")

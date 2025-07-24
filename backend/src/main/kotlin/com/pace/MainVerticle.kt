@@ -13,7 +13,7 @@ import com.pace.router.ConversationRouter
 import com.pace.router.MessageRouter
 import com.pace.router.UserRouter
 import com.pace.security.JwtConfig
-import com.pace.security.JwtService
+import com.pace.security.TokenService
 import com.pace.ws.ConnectionsManager
 import com.pace.ws.WebSocketHandler
 import io.vertx.core.AbstractVerticle
@@ -33,7 +33,6 @@ import org.apache.logging.log4j.kotlin.logger
 
 class MainVerticle : AbstractVerticle() {
 
-    private var jwtService: JwtService = JwtService()
     private lateinit var db: DbAccessible
 
     override fun start() {
@@ -66,8 +65,10 @@ class MainVerticle : AbstractVerticle() {
         )
 
         router.route().handler(BodyHandler.create())
+        val tokenService = TokenService.create(WebClient.create(vertx), conf.authService)
+
         // Public routes
-        AuthRouter(router, db).setupRoutes()
+        AuthRouter(router, tokenService, db).setupRoutes()
         val connectionsManager = ConnectionsManager(db)
         // Protected routes using JWT authentication
 
@@ -102,17 +103,24 @@ class MainVerticle : AbstractVerticle() {
                         }
                     }
                 router.route("/v1/*").subRouter(UserRouter(Router.router(vertx), db).setupRoutes())
-                router.route("/v1/*").subRouter(ConversationRouter(Router.router(vertx), db, connectionsManager).setupRoutes())
+                router.route("/v1/*")
+                    .subRouter(ConversationRouter(Router.router(vertx), db, connectionsManager).setupRoutes())
                 router.route("/v1/*").subRouter(MessageRouter(Router.router(vertx), db).setupRoutes())
             }
             .onFailure { LOGGER.error(it) { "Failed to mount protected paths" } }
         // WebSocket Handler
-        val wsHandler = WebSocketHandler(vertx, jwtService, db, connectionsManager)
+        val wsHandler = WebSocketHandler(vertx, tokenService, db, connectionsManager)
         val appConf = conf.application
         // Create HTTP server that also handles WebSockets
-        vertx.createHttpServer(HttpServerOptions().setPort(appConf.port).setHost(appConf.host))
+        vertx.createHttpServer(
+            HttpServerOptions()
+                .setPort(appConf.port)
+                .setHost(appConf.host)
+                .setRegisterWebSocketWriteHandlers(true)
+        )
             .requestHandler(router) // Handle HTTP requests
             .webSocketHandler { wsHandler.handle(it) } // Handle WebSocket connections
+            .webSocketHandshakeHandler { wsHandler.handleHandshake(it) } // Handle WebSocket connections
             .listen(appConf.port)
             .onSuccess { http ->
                 LOGGER.info("HTTP and WebSocket server started on http://${appConf.host}:${appConf.port}")

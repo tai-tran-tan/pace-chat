@@ -26,14 +26,6 @@ internal class CommonDbService(
         return storage.findUserByIds(userIds)
     }
 
-    override suspend fun authenticateUser(username: String, password: String): AuthenticationResponse? {
-        return storage.authenticate(username, password)
-    }
-
-    override suspend fun refreshToken(refreshToken: String): AuthenticationResponse? {
-        return storage.refreshToken(refreshToken)
-    }
-
     override suspend fun getUserInfo(token: String): User? {
         return storage.getUserInfo(token)
     }
