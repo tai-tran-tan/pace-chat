@@ -153,7 +153,6 @@ export const useAuthStore = create<AuthStore>()(
         } finally {
           // Clear localStorage
           localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
           localStorage.removeItem('user');
           
           // Disconnect WebSocket

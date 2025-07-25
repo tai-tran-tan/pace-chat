@@ -37,15 +37,18 @@ class ApiService {
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
     });
 
     // Create separate instance for refresh token to avoid infinite loop
     this.refreshApi = axios.create({
+      withCredentials: true,
       baseURL: this.baseURL,
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
     });
 
@@ -85,28 +88,19 @@ class ApiService {
 
           originalRequest._retry = true;
           this.isRefreshing = true;
-
+          console.log('Attempting to refresh token')
           try {
-            const refreshToken = this.getRefreshToken();
-            if (refreshToken) {
-              // Use separate refreshApi instance to avoid infinite loop
-              const response = await this.refreshApi.post('/auth/refresh', { 
-                refresh_token: refreshToken 
-              });
-              const newToken = data.data.access_token;
-              this.setTokens(newToken, data.data.refresh_token);
-              
-              // Process queued requests
-              this.processQueue(null, newToken);
-              
-              originalRequest.headers.Authorization = `Bearer ${newToken}`;
-              return this.api(originalRequest);
-            } else {
-              this.processQueue(new Error('No refresh token available'));
-              this.clearTokens();
-              window.location.href = '/auth/login';
-              return Promise.reject(error);
-            }
+            // Use separate refreshApi instance to avoid infinite loop
+            // refresh_token is in an http-only cookie, YOU SHALL NOT TOUCH !!!
+            const response = await this.refreshApi.post('/auth/refresh-token');
+            const newToken = response.data.access_token;
+            this.setTokens(newToken);
+            
+            // Process queued requests
+            this.processQueue(null, newToken);
+            
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return this.api(originalRequest);
           } catch (refreshError) {
             // If refresh token fails, clear tokens and redirect to login
             this.processQueue(refreshError);
@@ -288,38 +282,30 @@ class ApiService {
     return null;
   }
 
-  private getRefreshToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('refresh_token');
-    }
-    return null;
-  }
-
-  private setTokens(accessToken: string, refreshToken: string): void {
+  private setTokens(accessToken: string): void {
     if (typeof window !== 'undefined') {
       localStorage.setItem('access_token', accessToken);
-      localStorage.setItem('refresh_token', refreshToken);
     }
   }
 
   private clearTokens(): void {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
     }
   }
 
   // Auth endpoints
   async login(credentials: LoginRequest): Promise<AxiosResponse<ApiResponse<LoginResponse>>> {
-    const response = await this.api.post('/auth/login', credentials);
+    const response = await this.api.post('/auth/login', credentials, {withCredentials: true});
     
     // Check if response has the expected structure
     const data = response.data
     if (data && data.user_id && data.access_token) {
-      this.setTokens(data.access_token, data.refresh_token);
+      this.setTokens(data.access_token);
     }
     return response;
   }
+  
 
   async register(userData: RegisterRequest): Promise<AxiosResponse<ApiResponse<RegisterResponse>>> {
     const response = await this.api.post('/auth/register', userData);
@@ -333,10 +319,6 @@ class ApiService {
     const response = await this.api.post('/auth/logout');
     this.clearTokens();
     return response;
-  }
-
-  async refreshToken(token: string): Promise<AxiosResponse<ApiResponse<LoginResponse>>> {
-    return this.refreshApi.post('/auth/refresh', { refresh_token: token });
   }
 
   async getCurrentUser(): Promise<AxiosResponse<ApiResponse<User>>> {
@@ -463,7 +445,7 @@ class ApiService {
   }
 
   private isAuthEndpoint(url: string | undefined): boolean {
-    const authEndpoints = ['/auth/login', '/auth/register', '/auth/logout', '/auth/refresh', '/auth/me'];
+    const authEndpoints = ['/auth/login', '/auth/register', '/auth/logout', '/auth/refresh-token', '/auth/me'];
     return authEndpoints.some(endpoint => url?.includes(endpoint) || false);
   }
 }

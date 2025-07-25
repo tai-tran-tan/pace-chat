@@ -79,7 +79,6 @@ class WebSocketService {
   private forceLogout(): void {
     // Clear all auth data
     localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
     
     // Clear auth store

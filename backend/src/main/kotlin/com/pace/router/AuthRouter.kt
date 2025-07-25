@@ -7,15 +7,18 @@ import com.pace.data.model.AuthLoginRequest
 import com.pace.data.model.AuthLoginResponse
 import com.pace.data.model.AuthRegisterRequest
 import com.pace.data.model.AuthRegisterResponse
-import com.pace.data.model.RefreshTokenRequest
 import com.pace.data.model.User
 import com.pace.extensions.bodyAsPojo
 import com.pace.extensions.coroutineHandler
 import com.pace.extensions.toJsonString
 import com.pace.security.TokenService
+import io.vertx.core.http.Cookie
+import io.vertx.core.http.CookieSameSite
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
 import org.apache.logging.log4j.kotlin.logger
+
+private const val REFRESH_TOKEN = "refresh_token"
 
 class AuthRouter(
     private val router: Router,
@@ -76,13 +79,22 @@ class AuthRouter(
             val res = tokenService.authenticate(request.username, request.password)
 
             if (res != null) {
-                val token = tokenService.verifyIdToken(res.accessToken)
+                val token = tokenService.verifyToken(res.accessToken)
                 val user = AuthLoginResponse(
                     token.userId, token.username,
                     res.accessToken, res.expiresIn,
                     res.refreshToken, res.refreshExpiresIn
                 )
-                rc.response().setStatusCode(200)
+                rc.response()
+                    .addCookie(
+                        Cookie.cookie(REFRESH_TOKEN, res.refreshToken)
+                            .setHttpOnly(true)
+                            .setPath("/")
+                            .setMaxAge(res.refreshExpiresIn) // Cookie expires along with the token
+                            .setSameSite(CookieSameSite.LAX)
+//                            .setSecure()
+                    )
+                    .setStatusCode(200)
                     .end(user.toJsonString())
                 LOGGER.info("User logged in: ${request.username}")
             } else {
@@ -90,9 +102,15 @@ class AuthRouter(
             }
         }
 
-        router.post("/v1/auth/refresh-token").handler(BodyHandler.create()).coroutineHandler { rc ->
-            val request = rc.bodyAsPojo<RefreshTokenRequest>()
-            val token = tokenService.refreshToken(request.refreshToken)
+        router.post("/v1/auth/refresh-token").coroutineHandler { rc ->
+            val cookie = rc.request().getCookie(REFRESH_TOKEN)
+            if (cookie == null) { // TODO: check this, possible vertx's bug unable to parse this tag from cookie || !cookie.isHttpOnly) {
+                rc.response().setStatusCode(400)
+                    .end(mapOf("message" to "Missing http-only refresh_token in cookies").toJsonString())
+                LOGGER.warn { "${rc.request().remoteAddress()} missing a valid cookie" }
+                return@coroutineHandler
+            }
+            val token = tokenService.refreshToken(cookie.value)
             if (token != null) {
                 rc.response().setStatusCode(200).end(token.toJsonString())
                 LOGGER.info("Token refreshed for user: ${rc.get("userId", "")}")

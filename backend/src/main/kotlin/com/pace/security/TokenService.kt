@@ -18,7 +18,7 @@ import java.util.UUID
 class TokenService private constructor(private val client: WebClient, private val authConfig: AuthService) {
     private val baseUri = authConfig.baseUrl
     private val baseUriUser = "$baseUri/realms/${authConfig.realmName}"
-    suspend fun verifyIdToken(token: String): UserPublic {
+    suspend fun verifyToken(token: String): UserPublic {
         val token = client.postAbs("$baseUriUser/protocol/openid-connect/token/introspect")
             .basicAuthentication(authConfig.clientId, authConfig.clientSecret)
             .sendWithLog(

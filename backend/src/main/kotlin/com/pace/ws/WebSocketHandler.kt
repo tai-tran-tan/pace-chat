@@ -213,7 +213,7 @@ class WebSocketHandler(
                 return@launch
             }
 
-            val user = tokenService.verifyIdToken(token)
+            val user = tokenService.verifyToken(token)
             wsh.accept().onSuccess { ws ->
                 connectionsManager.addConnection(
                     ws.textHandlerID(),

@@ -53,7 +53,8 @@ class MainVerticle : AbstractVerticle() {
         // CORS Handler (for Flutter Web/Mobile)
         router.route().handler(
             CorsHandler.create()
-                .addOriginWithRegex(".*") // Allow all origins (for development)
+//                .addOriginWithRegex(".*") // Allow all origins (for development)
+                .addOrigin("http://localhost:3000")
                 .allowedMethod(HttpMethod.GET)
                 .allowedMethod(HttpMethod.POST)
                 .allowedMethod(HttpMethod.PUT)
