@@ -3,6 +3,8 @@ CREATE KEYSPACE if not exists pace_chat WITH replication = {
     'replication_factor': '1'
 }  AND durable_writes = true;
 
+use pace_chat;
+
 CREATE TABLE if not exists conversations_by_user (
     user_id uuid,
     conv_id timeuuid,
