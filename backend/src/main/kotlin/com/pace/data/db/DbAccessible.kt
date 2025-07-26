@@ -16,7 +16,7 @@ interface DbAccessible {
         content: String,
     ): Message?
 
-    suspend fun hasMoreMessages(conversationId: UUID, oldestMessageId: UUID?): Boolean
+    suspend fun hasOlderMessages(conversationId: UUID, oldestMessageId: UUID): Boolean
     suspend fun getMessagesForConversation(conversationId: UUID, limit: Int, beforeMessageId: UUID?): List<Message>
     suspend fun updateGroupParticipants(conversationId: UUID, addIds: List<UUID>?, removeIds: List<UUID>?): Boolean
     suspend fun createGroupConversation(creatorId: UUID, title: String, participantIds: List<UUID>): Conversation

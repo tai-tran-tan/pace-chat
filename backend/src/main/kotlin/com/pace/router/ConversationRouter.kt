@@ -17,6 +17,7 @@ class ConversationRouter(
     private val router: Router, private val db: DbAccessible, private val connectionsManager: ConnectionsManager
 ) {
     fun setupRoutes(): Router {
+        // all conversations current user in
         router.get("/conversations").coroutineHandler { rc ->
             val userId = rc.user().subject().let { UUID.fromString(it) }
             val conversations = db.getConversationsForUser(userId)
@@ -28,6 +29,7 @@ class ConversationRouter(
             rc.response().setStatusCode(200).end(conversations.toJsonString())
         }
 
+        // specific conversation
         router.get("/conversations/:conversationId").coroutineHandler { rc ->
             val userId = rc.user().subject().let { UUID.fromString(it) }
             val conversationId = rc.pathParam("conversationId").let { UUID.fromString(it) }
@@ -44,6 +46,7 @@ class ConversationRouter(
                 .end(conv.toConversationResponse(participants).toJsonString())
         }
 
+        // create or get private conversation
         router.post("/conversations/private").coroutineHandler { rc ->
             val userId = rc.user().subject().let { UUID.fromString(it) }
             val request = rc.bodyAsPojo<ConversationPrivateRequest>()
@@ -78,6 +81,7 @@ class ConversationRouter(
             LOGGER.info("Private conversation created between $userId and ${targetUser.userId}")
         }
 
+        // create group conversation
         router.post("/conversations/group").coroutineHandler { rc ->
             val userId = rc.user().subject().let { UUID.fromString(it) }
             val request = rc.bodyAsPojo<ConversationGroupCreateRequest>()
@@ -103,6 +107,7 @@ class ConversationRouter(
             LOGGER.info("Group conversation '${newConversation.title}' created by $userId")
         }
 
+        // update participants in a conversation
         router.put("/conversations/group/:conversationId/participants").coroutineHandler { rc ->
             val userId = rc.user().subject().let { UUID.fromString(it) }
             val conversationId = rc.pathParam("conversationId").let { UUID.fromString(it) }

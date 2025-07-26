@@ -178,17 +178,11 @@ internal class CommonDbService(
         conversationId: UUID,
         limit: Int,
         beforeMessageId: UUID?
-    ): List<Message> {
-        return storage.getMessagesForConversation(conversationId, limit, beforeMessageId)
-    }
+    ): List<Message> =
+        storage.getMessagesForConversation(conversationId, limit, beforeMessageId)
 
-    override suspend fun hasMoreMessages(conversationId: UUID, oldestMessageId: UUID?): Boolean {
-        if (oldestMessageId == null) return false
-        val allMessages = storage.getMessagesForConversation(conversationId, beforeMessageId = oldestMessageId)
-            .sortedBy { it.timestamp }
-
-        return allMessages.any { it.messageId == oldestMessageId }
-    }
+    override suspend fun hasOlderMessages(conversationId: UUID, oldestMessageId: UUID) =
+        storage.hasOlderMessagesForConversation(conversationId, beforeMessageId = oldestMessageId)
 
     override suspend fun addMessage(
         conversationId: UUID,

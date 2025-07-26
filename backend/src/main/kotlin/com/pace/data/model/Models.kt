@@ -202,7 +202,6 @@ data class Message @JvmOverloads constructor(
 data class MessagesHistoryResponse(
     val messages: List<Message>,
     val hasMore: Boolean,
-    val nextBeforeMessageId: UUID?
 )
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy::class)

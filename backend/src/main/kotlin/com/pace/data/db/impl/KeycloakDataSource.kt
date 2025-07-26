@@ -140,8 +140,12 @@ class KeycloakDataSource @Inject constructor(
         val msg = if (beforeMessageId == null)
             messageDao.findByConversation(conversationId, limit).all()
         else messageDao.findByConversation(conversationId, before = beforeMessageId, limit).all()
-        return msg.sortedBy { it.timestamp } // maintaining "natural order"
+        return msg.sortedBy { it.timestamp } // maintaining "natural order", oldest first
     }
+
+    override suspend fun hasOlderMessagesForConversation(conversationId: UUID, beforeMessageId: UUID) =
+        messageDao.findByConversation(conversationId, beforeMessageId, 1)
+            .availableWithoutFetching > 0
 
     override suspend fun addMessage(newMessage: Message) {
         messageDao.save(newMessage)

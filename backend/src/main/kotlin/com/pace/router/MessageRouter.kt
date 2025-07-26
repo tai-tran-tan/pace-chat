@@ -8,35 +8,36 @@ import com.pace.extensions.coroutineHandler
 import com.pace.extensions.toJsonString
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
-import io.vertx.json.schema.JsonSchema
 import org.apache.logging.log4j.kotlin.logger
 import java.util.UUID
 
+
 class MessageRouter(private val router: Router, private val db: DbAccessible) {
 
-    val schemaRepo = JsonSchema.of(true)
     fun setupRoutes(): Router {
+        // get messages in a conversation
         router.get("/conversations/:conversationId/messages")
-    .coroutineHandler { rc ->
-            val userId = rc.user().subject().let { UUID.fromString(it) }
-            val conversationId = rc.pathParam("conversationId").let { UUID.fromString(it) }
-            val limit = rc.request().getParam("limit")?.toIntOrNull() ?: 30
-            val beforeMessageId = rc.request().getParam("before_message_id")?.let { UUID.fromString(it) }
+            .coroutineHandler { rc ->
+                val userId = rc.user().subject().let { UUID.fromString(it) }
+                val conversationId = rc.pathParam("conversationId").let { UUID.fromString(it) }
+                val limit = rc.request().getParam("limit")?.toIntOrNull() ?: 30
+                val beforeMessageId = rc.request().getParam("before_message_id")?.let { UUID.fromString(it) }
 
-            val conversation = db.findConversationById(conversationId)
-            if (conversation == null || !conversation.participants.any { it == userId }) {
-                rc.response().setStatusCode(404)
-                    .end(mapOf("message" to "Conversation not found or not accessible").toJsonString())
-                return@coroutineHandler
+                val conversation = db.findConversationById(conversationId)
+                if (conversation == null || !conversation.participants.any { it == userId }) {
+                    rc.response().setStatusCode(404)
+                        .end(mapOf("message" to "Conversation not found or not accessible").toJsonString())
+                    return@coroutineHandler
+                }
+
+                val messages = db.getMessagesForConversation(conversationId, limit, beforeMessageId)
+                val hasMore = messages.takeIf { it.isNotEmpty() }
+                    ?.let { db.hasOlderMessages(conversationId, it.first().messageId) }
+                    ?: false
+
+                rc.response().setStatusCode(200)
+                    .end(MessagesHistoryResponse(messages, hasMore).toJsonString())
             }
-
-            val messages = db.getMessagesForConversation(conversationId, limit, beforeMessageId)
-            val hasMore = db.hasMoreMessages(conversationId, messages.firstOrNull()?.messageId)
-            val nextBeforeMessageId = if (hasMore && messages.isNotEmpty()) messages.first().messageId else null
-
-            rc.response().setStatusCode(200)
-                .end(MessagesHistoryResponse(messages, hasMore, nextBeforeMessageId).toJsonString())
-        }
 
         router.post("/messages/upload").handler(BodyHandler.create().setHandleFileUploads(true))
             .coroutineHandler { rc ->
@@ -62,6 +63,7 @@ class MessageRouter(private val router: Router, private val db: DbAccessible) {
             }
         return router
     }
+
     companion object {
         private val LOGGER = logger()
     }

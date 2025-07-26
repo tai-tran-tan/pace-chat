@@ -28,18 +28,15 @@ val mainVerticleName = "com.pace.MainVerticle"
 val launcherClassName = "io.vertx.launcher.application.VertxApplication"
 val watchForChange = "src/**/*"
 
-val doOnChange = "${projectDir}/gradlew classes"
+val onChange = "${projectDir}/gradlew classes"
 
 application {
-    mainClass.set(launcherClassName)
-}
-//val launcherClassName = "io.vertx.launcher.application.VertxApplication"
-
-application {
-    mainClass.set(launcherClassName)
+    mainClass = launcherClassName
 }
 vertx {
     mainVerticle = mainVerticleName
+    redeploy = true
+    watch = listOf(watchForChange)
 }
 
 // Define Vert.x version
@@ -120,12 +117,11 @@ tasks.withType<Test> {
 }
 
 tasks.withType<JavaExec> {
+//    args = listOf(mainVerticleName)
     args = listOf(mainVerticleName)
-//    args = listOf(
-//        "run", mainVerticleName,
 //        "--redeploy=$watchForChange",
 //        "--launcher-class=$launcherClassName",
-//        "--on-redeploy=$doOnChange",
+//        "--on-redeploy=$onChange",
 //    )
 }
 

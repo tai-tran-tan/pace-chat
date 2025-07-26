@@ -17,7 +17,8 @@ interface DataSource {
     suspend fun findConversationById(conversationId: UUID): Conversation?
     suspend fun findPrivateConversation(user1Id: UUID, user2Id: UUID): Conversation?
     suspend fun addConversation(newConv: Conversation)
-    suspend fun getMessagesForConversation(conversationId: UUID, limit: Int = 50, beforeMessageId: UUID?): List<Message>
+    suspend fun getMessagesForConversation(conversationId: UUID, limit: Int = 30, beforeMessageId: UUID?): List<Message>
+    suspend fun hasOlderMessagesForConversation(conversationId: UUID, beforeMessageId: UUID): Boolean
     suspend fun addMessage(newMessage: Message)
     suspend fun findMessageByMessageId(messageId: UUID): Message?
     suspend fun updateUser(user: User)
