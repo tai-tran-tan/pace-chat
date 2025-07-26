@@ -187,9 +187,9 @@ data class ConversationGroupParticipantsUpdate(
 data class Message @JvmOverloads constructor(
     @PartitionKey(1)
     @JsonProperty("conversation_id")
-    val convId: UUID,
+    val convId: UUID, // timeuuid
     @ClusteringColumn(1)
-    val messageId: UUID,
+    val messageId: UUID, // timeuuid
     @ClusteringColumn(2)
     val senderId: UUID,
     val content: String,

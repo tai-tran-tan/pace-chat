@@ -49,6 +49,8 @@ interface MessageDao {
 
     @Select(customWhereClause = "conv_id = :convId limit :lim")
     fun findByConversation(convId: UUID, lim: Int): PagingIterable<Message>
+    @Select(customWhereClause = "conv_id = :convId and message_id < :before limit :lim")
+    fun findByConversation(convId: UUID, before: UUID, lim: Int): PagingIterable<Message>
 }
 
 
