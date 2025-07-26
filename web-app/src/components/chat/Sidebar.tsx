@@ -2,10 +2,10 @@ import React from 'react';
 import UserProfile from './UserProfile';
 import SearchBar from './SearchBar';
 import ChatList from './ChatList';
-import { Conversation } from '@/types';
+import { DisplayConversation } from '@/types';
 
 interface SidebarProps {
-  chatItems: Conversation[];
+  chatItems: DisplayConversation[];
   user: {
     avatar?: string | null;
     username: string;

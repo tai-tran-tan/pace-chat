@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 
 interface ChatListItemProps {
   conversationId: string;
@@ -46,6 +46,18 @@ const ChatListItem: React.FC<ChatListItemProps> = ({
     );
   };
 
+  const calculateDuration = (time) => {
+    var value = null
+    const duration = Math.floor((new Date() - new Date(time)) / 1000);
+    if (duration >= 86400) value = { days: Math.floor(duration / 86400) }
+    else if (duration >= 3600) value = { hours: Math.floor(duration / 3600) }
+    else if (duration >= 60) value = { minutes: Math.floor(duration / 60) }
+    else value = { seconds: duration }
+    return new Intl.DurationFormat("en", { style: "short" }).format(value);
+  }
+
+  const msgOld = useMemo(() => calculateDuration(time), [time])
+
   return (
     <div
       className={`flex items-center px-4 py-3 cursor-pointer transition-colors hover:bg-gray-50 ${
@@ -74,7 +86,7 @@ const ChatListItem: React.FC<ChatListItemProps> = ({
           </div>
           <div className="flex flex-col items-end ml-2">
             <span className="text-xs text-gray-400 whitespace-nowrap">
-              {time}
+              {msgOld}
             </span>
           </div>
         </div>

@@ -23,6 +23,17 @@ export interface Conversation {
   unread_count?: number | null;
 }
 
+export interface DisplayConversation {
+  conversationId: string;
+  avatar: string;
+  displayName: string;
+  type: 'group' | 'private';
+  lastMessage: string;
+  unreadCount: number;
+  time: string;
+  selected: boolean;
+}
+
 export interface ConversationParticipant {
   user_id: string;
   username: string;

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Sidebar from '@/components/chat/Sidebar';
 import { useConversationStore } from '@/store/useConversationStore';
 import { useMessageStore } from '@/store/useMessageStore';
@@ -13,7 +13,7 @@ import conversationService from '@/services/conversationService';
 
 export default function ConversationsLayout({ children }: { children: React.ReactNode }) {
   const { conversations, fetchConversations, resetConversationUnreadCount } = useConversationStore();
-  const { getLastMessage } = useMessageStore();
+  const { getLastMessage, lastMessagesByConversation } = useMessageStore();
   const { user, logout } = useAuthStore();
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
@@ -58,16 +58,6 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     router.push(`/conversations/${conversationId}`);
   };
 
-  const calculateDuration = (time) => {
-    var value = null
-    const duration = Math.floor((new Date() - new Date(time)) / 1000);
-    if (duration >= 86400) value = { days: Math.floor(duration / 86400) }
-    else if (duration >= 3600) value = { hours: Math.floor(duration / 3600) }
-    else if (duration >= 60) value = { minutes: Math.floor(duration / 60) }
-    else value = { seconds: duration }
-    return new Intl.DurationFormat("en", { style: "short" }).format(value);
-  }
-
   const handleUserClick = async (userId: string) => {
     try {
       console.log('🔍 User clicked:', userId);
@@ -88,7 +78,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   };
 
   // Mapping conversations sang chatItems cho Sidebar
-  const chatItems = conversations.map((conv) => {
+  const chatItems = useMemo(() => conversations.map((conv) => {
     let avatar = '';
     let displayName = '';
     if (conv.type === 'private' && conv.participants) {
@@ -104,9 +94,9 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     const lastMessageFromStore = getLastMessage(conv.conversation_id);
     const lastMessageContent = lastMessageFromStore?.content || conv.last_message_preview || 'No messages yet';
     const lastMessageTime = isClient && lastMessageFromStore?.timestamp 
-      ? calculateDuration(lastMessageFromStore.timestamp)
+      ? lastMessageFromStore.timestamp
       : isClient && conv.last_message_timestamp
-      ? calculateDuration(conv.last_message_timestamp) : '';
+      ? conv.last_message_timestamp : '';
 
     return {
       conversationId: conv.conversation_id,
@@ -118,7 +108,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       time: lastMessageTime,
       selected: false,
     };
-  });
+  }), [conversations, lastMessagesByConversation]);
 
   return (
     <div className='flex h-screen bg-blue-50'>
