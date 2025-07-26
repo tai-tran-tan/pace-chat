@@ -58,6 +58,16 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     router.push(`/conversations/${conversationId}`);
   };
 
+  const calculateDuration = (time) => {
+    var value = null
+    const duration = Math.floor((new Date() - new Date(time)) / 1000);
+    if (duration >= 86400) value = { days: Math.floor(duration / 86400) }
+    else if (duration >= 3600) value = { hours: Math.floor(duration / 3600) }
+    else if (duration >= 60) value = { minutes: Math.floor(duration / 60) }
+    else value = { seconds: duration }
+    return new Intl.DurationFormat("en", { style: "short" }).format(value);
+  }
+
   const handleUserClick = async (userId: string) => {
     try {
       console.log('🔍 User clicked:', userId);
@@ -94,10 +104,9 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     const lastMessageFromStore = getLastMessage(conv.conversation_id);
     const lastMessageContent = lastMessageFromStore?.content || conv.last_message_preview || 'No messages yet';
     const lastMessageTime = isClient && lastMessageFromStore?.timestamp 
-      ? new Date(lastMessageFromStore.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      ? calculateDuration(lastMessageFromStore.timestamp)
       : isClient && conv.last_message_timestamp
-      ? new Date(conv.last_message_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : '';
+      ? calculateDuration(conv.last_message_timestamp) : '';
 
     return {
       conversationId: conv.conversation_id,

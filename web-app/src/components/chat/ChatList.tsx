@@ -55,7 +55,7 @@ const ChatList: React.FC<ChatListProps> = ({ items, onItemClick }) => {
           name={conversation.displayName}
           lastMessage={conversation.lastMessage || 'No messages yet'}
           unreadCount={conversation.unreadCount}
-          time={formatTime(conversation.time)}
+          time={conversation.time}
           onClick={() => onItemClick?.(conversation.conversationId)}
         />
       ))}

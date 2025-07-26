@@ -215,7 +215,7 @@ export interface LoadingState {
 
 // Pagination types
 export interface PaginationParams {
-  page: number;
+  before_message_id: string;
   limit: number;
 }
 
