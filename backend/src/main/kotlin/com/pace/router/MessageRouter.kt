@@ -8,13 +8,16 @@ import com.pace.extensions.coroutineHandler
 import com.pace.extensions.toJsonString
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.handler.BodyHandler
+import io.vertx.json.schema.JsonSchema
 import org.apache.logging.log4j.kotlin.logger
 import java.util.UUID
 
 class MessageRouter(private val router: Router, private val db: DbAccessible) {
 
+    val schemaRepo = JsonSchema.of(true)
     fun setupRoutes(): Router {
-        router.get("/conversations/:conversationId/messages").coroutineHandler { rc ->
+        router.get("/conversations/:conversationId/messages")
+    .coroutineHandler { rc ->
             val userId = rc.user().subject().let { UUID.fromString(it) }
             val conversationId = rc.pathParam("conversationId").let { UUID.fromString(it) }
             val limit = rc.request().getParam("limit")?.toIntOrNull() ?: 30

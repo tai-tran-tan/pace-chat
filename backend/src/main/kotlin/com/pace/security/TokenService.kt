@@ -22,7 +22,7 @@ class TokenService private constructor(private val client: WebClient, private va
         val token = client.postAbs("$baseUriUser/protocol/openid-connect/token/introspect")
             .basicAuthentication(authConfig.clientId, authConfig.clientSecret)
             .sendWithLog(
-                HeadersMultiMap()
+                HeadersMultiMap.httpHeaders()
                     .add("token", token)
             )?.deserialize<KeycloakValidatedToken>()
         requireNotNull(token) { "Token validation failed!" }
@@ -42,7 +42,7 @@ class TokenService private constructor(private val client: WebClient, private va
     suspend fun authenticate(username: String, password: String): AuthenticationResponse? {
         return client.postAbs("$baseUriUser/protocol/openid-connect/token")
             .sendWithLog(
-                HeadersMultiMap()
+                HeadersMultiMap.httpHeaders()
                     .add("grant_type", "password")
                     .add("client_id", authConfig.clientId)
                     .add("username", username)
@@ -56,7 +56,7 @@ class TokenService private constructor(private val client: WebClient, private va
     suspend fun refreshToken(refreshToken: String): AuthenticationResponse? {
         return client.postAbs("$baseUriUser/protocol/openid-connect/token")
             .sendWithLog(
-                HeadersMultiMap()
+                HeadersMultiMap.httpHeaders()
                     .add("grant_type", "refresh_token")
                     .add("client_id", authConfig.clientId)
                     .add("refresh_token", refreshToken)

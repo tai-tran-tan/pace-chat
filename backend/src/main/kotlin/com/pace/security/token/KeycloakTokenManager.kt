@@ -53,7 +53,7 @@ class KeycloakTokenManager(
     }
 
     private suspend fun fetchNewToken(): KeycloakToken {
-        val form = HeadersMultiMap()
+        val form = HeadersMultiMap.httpHeaders()
             .add("grant_type", "client_credentials")
             .add("client_id", config.clientId)
             .add("client_secret", config.clientSecret)

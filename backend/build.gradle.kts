@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 plugins {
     kotlin("jvm") version "2.1.20"
     kotlin("kapt") version "1.9.22"
+    java
     application
     id("io.vertx.vertx-plugin") version "1.4.0" // Vert.x Gradle plugin
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23" // Kotlinx Serialization
@@ -23,13 +24,8 @@ repositories {
     mavenCentral()
 }
 
-// Define Vert.x version
-val vertxVersion = "4.5.15"
-val junitJupiterVersion = "5.9.1"
-
-
 val mainVerticleName = "com.pace.MainVerticle"
-val launcherClassName = "io.vertx.core.Launcher"
+val launcherClassName = "io.vertx.launcher.application.VertxApplication"
 val watchForChange = "src/**/*"
 
 val doOnChange = "${projectDir}/gradlew classes"
@@ -46,10 +42,17 @@ vertx {
     mainVerticle = mainVerticleName
 }
 
+// Define Vert.x version
+val vertxVersion = "5.0.1"
+val junitJupiterVersion = "5.9.1"
+
 dependencies {
     // Vert.x Core & Web
+    implementation(platform("io.vertx:vertx-stack-depchain:$vertxVersion"))
+    implementation("io.vertx:vertx-launcher-application:$vertxVersion")
     implementation("io.vertx:vertx-core:$vertxVersion")
     implementation("io.vertx:vertx-web:$vertxVersion")
+    implementation("io.vertx:vertx-web-validation:$vertxVersion")
     implementation("io.vertx:vertx-web-client:$vertxVersion")
     implementation("io.vertx:vertx-json-schema:$vertxVersion") // For basic JSON schema if needed
     implementation("io.vertx:vertx-auth-oauth2:$vertxVersion")
@@ -57,8 +60,6 @@ dependencies {
     implementation("com.auth0:java-jwt:4.5.0")
     implementation("com.auth0:jwks-rsa:0.22.2")
 //    implementation("org.keycloak:keycloak-authz-client:26.0.6") //23.0.7
-    // Kotlinx Serialization for JSON (Vert.x doesn't bundle it, we use it directly)
-//    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.19.0")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
@@ -84,9 +85,6 @@ dependencies {
     implementation("org.apache.logging.log4j:log4j-slf4j2-impl:2.23.1")
     implementation("org.apache.logging.log4j:log4j-core:2.23.1") // Or the latest version
     implementation("org.apache.logging.log4j:log4j-api-kotlin:1.3.0") // Or the latest version
-
-    // UUID generation (built-in in JVM, but useful to list)
-    // No explicit dependency needed for java.util.UUID
 
     // For java.time.Instant serialization/deserialization with kotlinx.serialization
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
@@ -122,13 +120,13 @@ tasks.withType<Test> {
 }
 
 tasks.withType<JavaExec> {
-    args = listOf(
-        "run", mainVerticleName,
-        "--redeploy=$watchForChange",
-        "--launcher-class=$launcherClassName",
-        "--on-redeploy=$doOnChange",
-//        "--java-opts", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8000"
-    )
+    args = listOf(mainVerticleName)
+//    args = listOf(
+//        "run", mainVerticleName,
+//        "--redeploy=$watchForChange",
+//        "--launcher-class=$launcherClassName",
+//        "--on-redeploy=$doOnChange",
+//    )
 }
 
 tasks.withType<Jar>() {

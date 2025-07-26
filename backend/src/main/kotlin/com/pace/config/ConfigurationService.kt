@@ -31,12 +31,13 @@ object ConfigurationService {
 
         val retriever = ConfigRetriever.create(vertx, options)
 
-        retriever.getConfig {
-            if (it.failed() || it.result() == null || it.result().isEmpty) {
-                LOGGER.error(it.cause()) { "Failed to get configuration" }
-            } else LOGGER.info("Configuration retrieved ")// + it.result())
-        }
+//        retriever.getConfig {
+//            if (it.failed() || it.result() == null || it.result().isEmpty) {
+//                LOGGER.error(it.cause()) { "Failed to get configuration" }
+//            } else
+//        }
         return retriever.config.map { json ->
+            LOGGER.info("Configuration retrieved ")
             json.deserialize<Configuration>()
         }.onFailure {
             LOGGER.error(it) { "Failed to process configuration" }
